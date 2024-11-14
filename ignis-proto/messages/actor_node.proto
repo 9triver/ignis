@@ -1,0 +1,25 @@
+syntax = "proto3";
+package proto;
+option go_package = "actors/proto";
+
+import "actor.proto";
+
+message ActorReady {
+  actor.PID Sender = 1;
+  string ActorName = 2;
+  string GroupName = 3;
+  int64 ProcessLatency = 4;
+}
+
+message ActorStopped {
+  actor.PID Sender = 1;
+  string ActorName = 2;
+}
+
+message DeployPythonActor {
+  string Name = 1;
+  string Venv = 2;
+  repeated string Packages = 3;
+  repeated string Parameters = 4;
+  bytes PickledCode = 5;
+}

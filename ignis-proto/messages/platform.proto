@@ -1,0 +1,43 @@
+syntax = "proto3";
+package proto;
+option go_package = "actors/proto";
+
+import "actor.proto";
+
+enum Language {
+  LANG_UNKNOWN = 0;
+  LANG_JSON = 1;
+  LANG_GO = 2;
+  LANG_PYTHON = 3;
+}
+
+message ObjectRequest {
+  actor.PID Sender = 1;
+  string ID = 2;
+}
+
+message EncodedObject {
+  string ID = 1; // if returned from ipc call, id won't be set 
+  bytes Data = 2;
+  Language Language = 3;
+}
+
+message Flow {
+  actor.PID Actor = 1;
+  string ObjectID = 2;
+}
+
+message Error {
+  actor.PID Sender = 1;
+  string Message = 2;
+}
+
+message Ack {
+  actor.PID Sender = 1;
+}
+
+message Execute {
+  string ExecutionID = 1;
+  map<string, Flow> Flows = 2;
+  actor.PID ReplyTo = 3;
+}

@@ -1,0 +1,31 @@
+syntax = "proto3";
+package ipc;
+option go_package = "actors/proto/ipc";
+
+import "platform.proto";
+
+enum DealerCommand {
+  DEALER_UNSPECIFIED = 0;
+  DEALER_READY = 1;
+  DEALER_RETURN = 2;
+}
+
+message Ready {
+  string Name = 1;
+}
+
+message Return {
+  uint64 ID = 1;
+  oneof Result {
+    proto.EncodedObject Value = 2;
+    string Error = 3;
+  }
+}
+
+message DealerMessage {
+  DealerCommand Command = 1;
+  oneof Payload {
+    Ready Ready = 2;
+    Return Return = 3;
+  }
+}

@@ -1,0 +1,67 @@
+syntax = "proto3";
+package dag;
+option go_package = "actors/proto/dag";
+
+import "actor.proto";
+import "platform.proto";
+
+enum CommandType {
+  COMMAND_Create = 0;
+  COMMAND_AppendNode = 1;
+  COMMAND_AppendEdge = 2;
+  COMMAND_AppendOutput = 3;
+  COMMAND_Serve = 4;
+  COMMAND_Execute = 5;
+  COMMAND_Destroy = 6;
+}
+
+message Command {
+  CommandType Type = 1;
+  string DAG = 2;
+  oneof Command {
+    Create Create = 3;
+    AppendNode AppendNode = 4;
+    AppendEdge AppendEdge = 5;
+    AppendOutput AppendOutput = 6;
+    Serve Serve = 7;
+    Execute Execute = 8;
+    Destroy Destroy = 9;
+  }
+  actor.PID ReplyTo = 10;
+}
+
+message Create {}
+
+message AppendNode {
+  string Name = 1;
+  repeated string Params = 2;
+  oneof Option {
+    actor.PID Actor = 3;
+    string Group = 4;
+    proto.EncodedObject Value = 5;
+  }
+}
+
+message AppendEdge {
+  string From = 1;
+  string To = 2;
+  string Param = 3;
+}
+
+message AppendOutput {
+  string Node = 2;
+}
+
+message Serve {}
+
+message Execute {
+}
+
+message Destroy {}
+
+message ExecutionResult {
+  string DAG = 1;
+  string ExecutionID = 2;
+  map<string, proto.EncodedObject> Results = 3;
+  string Error = 4;
+}
