@@ -1,0 +1,62 @@
+syntax = "proto3";
+package executor;
+option go_package = "github.com/9triver/ignis/proto/executor";
+
+import "platform.proto";
+
+enum CommandType {
+  UNSPECIFIED = 0; // unknown command type
+  R_ADD_HANDLER = 1; // router: add new handler to executor
+  R_REMOVE_HANDLER = 2; // router: remove handler from executor
+  R_EXECUTE = 3; // router: execute task on executor
+  R_EXIT = 4; // router: notify executor to stop
+  D_READY = 5;
+  D_RETURN = 6;
+}
+
+message AddHandler {
+  string Name = 1;
+  bytes Handler = 2;
+  proto.Language Language = 3;
+  repeated string Methods = 4;
+}
+
+message RemoveHandler {
+  string Name = 1;
+}
+
+message Execute {
+  string CorrID = 1;
+  string Name = 2;
+  string Method = 3;
+  map<string, proto.EncodedObject> Args = 4;
+}
+
+message Exit {}
+
+message Ready {}
+
+message Return {
+  string CorrID = 1;
+  oneof Result {
+    proto.EncodedObject Value = 2;
+    string Error = 3;
+  }
+}
+
+message Message {
+  string Conn = 1;
+  CommandType Type = 2;
+  oneof Command {
+    AddHandler AddHandler = 3;
+    RemoveHandler RemoveHandler = 4;
+    Execute Execute = 5;
+    Exit Exit = 6;
+    Ready Ready = 7;
+    Return Return = 8;
+  }
+}
+
+service Service {
+  rpc Session(stream Message) returns (stream Message) {}
+}

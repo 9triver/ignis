@@ -1,7 +1,0 @@
-.vscode/
-bak/
-venv/
-__pycache__/
-# generated files
-*.pb.go
-

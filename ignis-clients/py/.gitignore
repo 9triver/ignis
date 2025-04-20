@@ -1,4 +1,0 @@
-*.egg-info
-build
-*_pb2.py
-*_pb2.pyi

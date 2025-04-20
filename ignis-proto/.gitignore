@@ -1,6 +1,2 @@
-# dependencies
-protoc/
-node_modules/
-*_pb2.py
-*_pb2.pyi
-ts/
+python/
+*.pb.go
