@@ -16,14 +16,14 @@ func TestObject(t *testing.T) {
 		"value": 100.0,
 		"id":    10,
 	}
-	obj := store.NewLocalObject(v, proto.LangGo)
+	obj := proto.NewLocalObject(v, proto.LangGo)
 	enc, err := obj.GetEncoded()
 	if err != nil {
 		t.Fatal("encode", err)
 	}
 	t.Logf("Encoded: %v -> %v\n", v, enc)
 
-	dec, err := enc.GetValue(nil)
+	dec, err := enc.GetValue()
 	if err != nil {
 		t.Fatal("decode", err)
 	}
@@ -42,8 +42,8 @@ func TestActor(t *testing.T) {
 		}
 	}, actor.WithOnInit(func(ctx actor.Context) {
 		pid := ctx.Spawn(storeProps)
-		ctx.Send(pid, store.NewLocalObject(1000, proto.LangJson))
-		enc, _ := store.NewLocalObject(1000, proto.LangJson).GetEncoded()
+		ctx.Send(pid, proto.NewLocalObject(1000, proto.LangJson))
+		enc, _ := proto.NewLocalObject(1000, proto.LangJson).GetEncoded()
 		ctx.Send(pid, enc)
 		ctx.Logger().Info("store", "object", enc.ID)
 

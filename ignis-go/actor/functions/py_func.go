@@ -63,7 +63,7 @@ func (f *PyFunction) Call(ctx actor.Context, sessionId string, params map[string
 	} else {
 		obj, method = f.Name(), ""
 	}
-	result, err := f.venv.Execute(obj, method, params).Result()
+	result, err := f.venv.Execute(ctx, obj, method, params).Result()
 	if err != nil {
 		return nil, errors.WrapWith(err, "%s: execution failed", f.name)
 	}

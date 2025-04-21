@@ -1,7 +1,8 @@
 package functions
 
 import (
-	"github.com/9triver/ignis/actor/store"
+	"reflect"
+
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
@@ -19,9 +20,15 @@ var _ Function = (*GoFunction[any, any])(nil)
 func (h *GoFunction[I, O]) Call(ctx actor.Context, sessionId string, params map[string]proto.Object) (proto.Object, error) {
 	invoke := make(map[string]any)
 	for k, v := range params {
-		value, err := v.GetValue(ctx)
-		if err != nil {
-			return nil, errors.WrapWith(err, "call: failed fetching param %s", k)
+		var value any
+		if s, ok := v.ToStream(); ok {
+			value = s.ToChan(ctx)
+		} else {
+			vv, err := v.GetValue()
+			if err != nil {
+				return nil, errors.WrapWith(err, "call: failed fetching param %s", k)
+			}
+			value = vv
 		}
 		invoke[k] = value
 	}
@@ -36,7 +43,13 @@ func (h *GoFunction[I, O]) Call(ctx actor.Context, sessionId string, params map[
 		return nil, errors.WrapWith(err, "call: execution failed")
 	}
 
-	obj := store.NewLocalObject(o, h.language)
+	t := reflect.TypeFor[O]()
+	var obj proto.Object
+	if t.Kind() == reflect.Chan {
+		obj = proto.NewLocalStream(o, h.language)
+	} else {
+		obj = proto.NewLocalObject(o, h.language)
+	}
 	return obj, nil
 }
 

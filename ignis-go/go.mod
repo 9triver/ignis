@@ -3,7 +3,7 @@ module github.com/9triver/ignis
 go 1.24
 
 require (
-	github.com/9triver/ignis/proto v0.0.1
+	// github.com/9triver/ignis/proto v0.0.1
 	github.com/asynkron/goconsole v0.0.0-20160504192649-bfa12eebf716
 	github.com/asynkron/protoactor-go v0.0.0-20240822202345-3c0e61ca19c9
 	github.com/mitchellh/mapstructure v1.5.0
@@ -11,7 +11,7 @@ require (
 	gopkg.in/zeromq/goczmq.v4 v4.1.0
 )
 
-replace github.com/9triver/ignis/proto => ../ignis-proto/go
+// replace github.com/9triver/ignis/proto => ../ignis-proto/go
 
 require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

@@ -2,6 +2,8 @@ package actor_test
 
 import (
 	"context"
+	"github.com/9triver/ignis/utils"
+	"log/slog"
 	"path"
 	"testing"
 	"time"
@@ -56,7 +58,7 @@ func rpcClient(storePID, computePID *actor.PID) {
 		panic(err)
 	}
 
-	encoded, _ := store.NewLocalObject(10, proto.LangJson).GetEncoded()
+	encoded, _ := proto.NewLocalObject(10, proto.LangJson).GetEncoded()
 	err = stream.Send(controller.NewAppendArgFromEncoded("session-0", "instance-0", "func", "B", encoded))
 	if err != nil {
 		panic(err)
@@ -86,7 +88,7 @@ func TestRemoteTask(t *testing.T) {
 	storeProps := store.New()
 	storePID := sys.Root.Spawn(storeProps)
 
-	taskFunc := functions.NewGo("graph-task", demoFunc, proto.LangGo)
+	taskFunc := functions.NewGo("graph-task", demoFunc, proto.LangJson)
 	computePID := sys.Root.Spawn(compute.NewActor("graph-task", taskFunc, storePID))
 
 	go func() {
@@ -109,4 +111,83 @@ func TestRemoteTask(t *testing.T) {
 	}()
 
 	<-time.After(10 * time.Second)
+}
+
+func TestRemoteStream(t *testing.T) {
+	storeProps := store.New()
+	sys := actor.NewActorSystem(actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
+		logger := utils.Logger()
+		return logger.With("system", system.ID)
+	}))
+	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
+
+	type N struct {
+		Num int
+	}
+
+	type I struct {
+		Ints <-chan int
+	}
+
+	type O struct {
+		Sum int
+	}
+
+	generateInts := func(input N) (<-chan int, error) {
+		ch := make(chan int)
+		go func() {
+			defer close(ch)
+			for i := range input.Num {
+				ch <- i
+			}
+		}()
+
+		return ch, nil
+	}
+
+	getSum := func(input I) (O, error) {
+		sum := 0
+		for i := range input.Ints {
+			println(i)
+			sum += i
+		}
+		return O{Sum: sum}, nil
+	}
+
+	f1 := functions.NewGo("genInts", generateInts, proto.LangJson)
+	f2 := functions.NewGo("getSum", getSum, proto.LangJson)
+
+	props1 := compute.NewActor("f1", f1, storePID)
+	props2 := compute.NewActor("f2", f2, storePID)
+	pid1 := sys.Root.Spawn(props1)
+	pid2 := sys.Root.Spawn(props2)
+
+	sys.Root.Send(pid1, &proto.CreateSession{
+		SessionID: "test",
+		Successors: []*proto.Successor{
+			{
+				ID:    "f2",
+				Param: "Ints",
+				PID:   pid2,
+			},
+		},
+	})
+
+	sys.Root.Send(pid2, &proto.CreateSession{
+		SessionID:  "test",
+		Successors: []*proto.Successor{},
+	})
+
+	sys.Root.Send(storePID, &store.SaveObject{
+		Value: proto.NewLocalObject(10, proto.LangJson),
+		Callback: func(ctx actor.Context, ref *proto.Flow) {
+			ctx.Send(pid1, &proto.Invoke{
+				SessionID: "test",
+				Param:     "Num",
+				Value:     ref,
+			})
+		},
+	})
+
+	<-time.After(100 * time.Second)
 }

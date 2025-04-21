@@ -12,6 +12,8 @@ enum CommandType {
   R_EXIT = 4; // router: notify executor to stop
   D_READY = 5;
   D_RETURN = 6;
+  STREAM_CHUNK = 7;
+  STREAM_END = 8;
 }
 
 message AddHandler {
@@ -44,6 +46,14 @@ message Return {
   }
 }
 
+message StreamChunk {
+  string StreamID = 1;
+  oneof Chunk {
+    proto.EncodedObject Value = 2;
+    string Error = 3;
+  }
+}
+
 message Message {
   string Conn = 1;
   CommandType Type = 2;
@@ -54,6 +64,8 @@ message Message {
     Exit Exit = 6;
     Ready Ready = 7;
     Return Return = 8;
+    StreamChunk StreamChunk = 9;
+    proto.EndOfStream StreamEnd = 10;
   }
 }
 

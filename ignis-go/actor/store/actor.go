@@ -1,75 +1,27 @@
 package store
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"os"
+	"github.com/9triver/ignis/utils"
 
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/utils"
-	"github.com/9triver/ignis/utils/errors"
 )
 
 type Actor struct {
 	name    string
 	objects map[string]proto.Object
-	streams map[string]*LocalStream
 }
 
 // SaveObject is sent to store when actor generates new return objects from functions
 type SaveObject struct {
-	Value    proto.Object                             // real object
+	Value    proto.Object                             // object or stream
 	Callback func(ctx actor.Context, ref *proto.Flow) // called when object saving is completed
-}
-
-type SaveChunk struct {
-	StreamID string
-	Value    proto.Object
-	IsEoS    bool
-	Callback func(ctx actor.Context, ref *proto.Flow, isEos bool)
-}
-
-// SaveStream is sent to store when a stream handler is called
-type SaveStream struct {
-	StreamID string                                       // id of the created stream
-	Callback func(ctx actor.Context, stream *LocalStream) // called when stream terminates
 }
 
 func (s *Actor) Name() string {
 	return s.name
-}
-
-func (s *Actor) SerializeToFile(path string) error {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return errors.WrapWith(err, "%s: serialization failed", s.name)
-	}
-	defer func() { _ = f.Close() }()
-
-	data, err := json.Marshal(s.objects)
-	if err != nil {
-		return errors.WrapWith(err, "%s: serialization failed", s.name)
-	}
-
-	buf := bufio.NewWriter(f)
-	_, err = buf.Write(data)
-	if err != nil {
-		return errors.WrapWith(err, "%s: serialization failed", s.name)
-	}
-
-	err = buf.Flush()
-	if err != nil {
-		return errors.WrapWith(err, "%s: serialization failed", s.name)
-	}
-	return nil
-}
-
-func (s *Actor) LoadFromFile(path string) error {
-	// TODO: unimplemented
-	panic("unimplemented")
 }
 
 func (s *Actor) responseObject(ctx actor.Context, req *proto.ObjectRequest, obj proto.Object) {
@@ -87,71 +39,77 @@ func (s *Actor) responseObject(ctx actor.Context, req *proto.ObjectRequest, obj 
 	ctx.Send(req.ReplyTo, reply)
 }
 
-func (s *Actor) responseStream(ctx actor.Context, req *proto.ObjectRequest, stream *LocalStream) {
-	for chunk := range stream.values {
-		s.responseObject(ctx, req, NewLocalObject(chunk, stream.language))
-	}
-}
-
 func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 	ctx.Logger().Info("request object",
 		"id", req.ID,
 	)
 
-	obj, ok1 := s.objects[req.ID]
-	stream, ok2 := s.streams[req.ID]
-	if !ok1 && !ok2 {
+	obj, ok := s.objects[req.ID]
+	if !ok {
 		ctx.Send(req.ReplyTo, &proto.Error{
 			Sender:  ctx.Self(),
 			Message: fmt.Sprintf("request %s: no such object", req.ID),
 		})
-	}
-
-	if ok1 {
-		s.responseObject(ctx, req, obj)
-	} else {
-		s.responseStream(ctx, req, stream)
-	}
-}
-
-func (s *Actor) onSaveObject(ctx actor.Context, obj *SaveObject) {
-	ctx.Logger().Info("save object",
-		"id", obj.Value.GetID(),
-	)
-
-	s.objects[obj.Value.GetID()] = obj.Value
-	if obj.Callback != nil {
-		obj.Callback(ctx, &proto.Flow{ObjectID: obj.Value.GetID(), Source: ctx.Self()})
-	}
-}
-
-func (s *Actor) onSaveStream(ctx actor.Context, stream *SaveStream) {
-	ctx.Logger().Info("store: save stream",
-		"id", stream.StreamID,
-	)
-	if _, ok := s.streams[stream.StreamID]; ok {
 		return
 	}
-	s.streams[stream.StreamID] = &LocalStream{
-		id:        stream.StreamID,
-		completed: false,
-		store:     ctx.Self(),
-		chunks:    nil,
-		values:    make(chan any),
-	}
+
+	s.responseObject(ctx, req, obj)
 }
 
-func (s *Actor) onSaveChunk(ctx actor.Context, chunk *SaveChunk) {
-	ctx.Logger().Info("store: save chunk",
-		"id", chunk.StreamID,
+func (s *Actor) onStreamRequest(ctx actor.Context, req *proto.StreamRequest) {
+	ctx.Logger().Info("request stream",
+		"id", req.StreamID,
 	)
-	stream, ok := s.streams[chunk.StreamID]
+
+	obj, ok := s.objects[req.StreamID]
 	if !ok {
+		ctx.Send(req.ReplyTo, &proto.Error{
+			Sender:  ctx.Self(),
+			Message: fmt.Sprintf("request %s: no such stream", req.StreamID),
+		})
 		return
 	}
-	stream.EnqueueChunk(chunk.Value, chunk.IsEoS)
-	if chunk.Callback != nil {
-		chunk.Callback(ctx, &proto.Flow{ObjectID: chunk.StreamID, Source: ctx.Self()}, chunk.IsEoS)
+	stream, ok := obj.ToStream()
+	if !ok {
+		ctx.Send(req.ReplyTo, &proto.Error{
+			Sender:  ctx.Self(),
+			Message: fmt.Sprintf("request %s: no such stream", req.StreamID),
+		})
+		return
+	}
+
+	objects := stream.ToChan(ctx)
+	go func() {
+		defer ctx.Send(req.ReplyTo, &proto.EndOfStream{})
+		for obj := range objects {
+			var msg any
+			if encoded, err := obj.GetEncoded(); err != nil {
+				msg = &proto.Error{
+					Sender:  ctx.Self(),
+					Message: fmt.Sprintf("request %s: %s", req.StreamID, err.Error()),
+				}
+			} else {
+				msg = &proto.StreamChunk{StreamID: req.StreamID, Object: encoded}
+			}
+			ctx.Send(req.ReplyTo, msg)
+		}
+	}()
+}
+
+func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
+	obj := save.Value
+	ctx.Logger().Info("save object",
+		"id", obj.GetID(),
+	)
+
+	if stream, ok := obj.(*proto.LocalStream); ok {
+		stream.SetRemote(ctx.Self())
+	}
+
+	s.objects[obj.GetID()] = obj
+
+	if save.Callback != nil {
+		save.Callback(ctx, &proto.Flow{ObjectID: obj.GetID(), Source: ctx.Self()})
 	}
 }
 
@@ -159,10 +117,8 @@ func (s *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *proto.ObjectRequest:
 		s.onObjectRequest(ctx, msg)
-	case *SaveStream:
-		s.onSaveStream(ctx, msg)
-	case *SaveChunk:
-		s.onSaveChunk(ctx, msg)
+	case *proto.StreamRequest:
+		s.onStreamRequest(ctx, msg)
 	case *SaveObject:
 		s.onSaveObject(ctx, msg)
 	}

@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"github.com/asynkron/protoactor-go/actor"
 	"os"
 	"os/exec"
 	"path"
@@ -22,6 +23,7 @@ type VirtualEnv struct {
 	handler remote.Executor
 	started bool
 	futures map[string]utils.Future[proto.Object]
+	streams map[string]*proto.LocalStream
 
 	Name     string   `json:"name"`
 	Exec     string   `json:"exec"`
@@ -66,7 +68,7 @@ func (v *VirtualEnv) AddPackages(p ...string) error {
 	return nil
 }
 
-func (v *VirtualEnv) Execute(name, method string, args map[string]proto.Object) utils.Future[proto.Object] {
+func (v *VirtualEnv) Execute(ctx actor.Context, name, method string, args map[string]proto.Object) utils.Future[proto.Object] {
 	fut := utils.NewFuture[proto.Object](configs.ExecutionTimeout)
 	encoded := make(map[string]*proto.EncodedObject)
 	for param, obj := range args {
@@ -83,6 +85,21 @@ func (v *VirtualEnv) Execute(name, method string, args map[string]proto.Object) 
 
 	msg := executor.NewExecute(v.Name, corrId, name, method, encoded)
 	v.handler.SendChan() <- msg
+
+	for _, arg := range args {
+		if stream, ok := arg.ToStream(); ok {
+			chunks := stream.ToChan(ctx)
+			go func() {
+				defer func() {
+					v.handler.SendChan() <- executor.NewStreamEnd(v.Name, stream.GetID())
+				}()
+				for chunk := range chunks {
+					encoded, err := chunk.GetEncoded()
+					v.handler.SendChan() <- executor.NewStreamChunk(v.Name, stream.GetID(), encoded, err)
+				}
+			}()
+		}
+	}
 	return fut
 }
 
@@ -90,23 +107,62 @@ func (v *VirtualEnv) Send(msg *executor.Message) {
 	v.handler.SendChan() <- msg
 }
 
-func (v *VirtualEnv) onReceive(msg *executor.Message) {
-	ret := msg.GetReturn()
-	if ret == nil {
-		return
-	}
+func (v *VirtualEnv) onReturn(ret *executor.Return) {
 	fut, ok := v.futures[ret.CorrID]
 	if !ok {
 		return
 	}
+	defer delete(v.futures, ret.CorrID)
 
 	obj, err := ret.Object()
 	if err != nil {
 		fut.Reject(err)
-	} else {
-		fut.Resolve(obj)
+		return
 	}
-	delete(v.futures, ret.CorrID)
+
+	var o proto.Object
+	if obj.Data != nil { // return a stream from python
+		o = obj
+	} else {
+		values := make(chan proto.Object)
+		ls := proto.NewLocalStream(values, obj.GetLanguage())
+		v.streams[ret.CorrID] = ls
+		o = ls
+	}
+	fut.Resolve(o)
+}
+
+func (v *VirtualEnv) onStreamChunk(chunk *executor.StreamChunk) {
+	stream, ok := v.streams[chunk.StreamID]
+	if !ok {
+		return
+	}
+
+	if chunk.GetError() != "" {
+		stream.EnqueueChunk(nil)
+	} else {
+		stream.EnqueueChunk(chunk.GetValue())
+	}
+}
+
+func (v *VirtualEnv) onStreamEnd(end *proto.EndOfStream) {
+	stream, ok := v.streams[end.StreamID]
+	if !ok {
+		return
+	}
+
+	stream.EnqueueChunk(nil)
+}
+
+func (v *VirtualEnv) onReceive(msg *executor.Message) {
+	switch cmd := msg.Command.(type) {
+	case *executor.Message_StreamChunk:
+		v.onStreamChunk(cmd.StreamChunk)
+	case *executor.Message_StreamEnd:
+		v.onStreamEnd(cmd.StreamEnd)
+	case *executor.Message_Return:
+		v.onReturn(cmd.Return)
+	}
 }
 
 func (v *VirtualEnv) Run(addr string) {

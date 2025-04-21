@@ -15,7 +15,7 @@ if [ ! -d ./python ]; then
 fi
 
 echo "Generating protobuf files for Go"
-$PROTOC --go_out=./go --go_opt=paths=source_relative --go-grpc_out=./go --go-grpc_opt=paths=source_relative $PROTO_SRC
+$PROTOC --go_out=../ignis-go/proto --go_opt=paths=source_relative --go-grpc_out=../ignis-go/proto --go-grpc_opt=paths=source_relative $PROTO_SRC
 
 PY_OUTPUTS="./python ../clients/py/actorc/protos"
 

@@ -36,7 +36,7 @@ func TestDAGWithLocal(t *testing.T) {
 	}))
 
 	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
-	obj := store.NewLocalObject(100, proto.LangGo)
+	obj := proto.NewLocalObject(100, proto.LangGo)
 	sys.Root.Send(storePID, &store.SaveObject{
 		Value: obj,
 	})
@@ -70,7 +70,7 @@ func TestDAGWithRemote(t *testing.T) {
 		return logger.With("system", system.ID)
 	}))
 	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
-	obj := store.NewLocalObject(100, proto.LangGo)
+	obj := proto.NewLocalObject(100, proto.LangGo)
 	sys.Root.Send(storePID, &store.SaveObject{
 		Value: obj,
 	})

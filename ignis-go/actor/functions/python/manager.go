@@ -164,6 +164,7 @@ func NewManager(ctx context.Context, manager remote.ExecutorManager) (*VenvManag
 		env.ctx = ctx
 		env.handler = manager.NewExecutor(ctx, env.Name)
 		env.futures = make(map[string]utils.Future[proto.Object])
+		env.streams = make(map[string]*proto.LocalStream)
 	}
 	return m, nil
 }

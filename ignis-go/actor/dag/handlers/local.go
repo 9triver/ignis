@@ -37,7 +37,7 @@ type LocalTaskHandler struct {
 func (h *LocalTaskHandler) InvokeAll(ctx actor.Context, successors []*proto.Successor) error {
 	futures := make(map[string]utils.Future[proto.Object])
 	for param, flow := range h.params {
-		futures[param] = utils.GetObject(ctx, flow)
+		futures[param] = flow.Get(ctx)
 	}
 
 	invoke := make(map[string]proto.Object)

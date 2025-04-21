@@ -34,16 +34,53 @@ func TestVenvExecutor(t *testing.T) {
 
 	defer func(manager *python.VenvManager) { _ = manager.Close() }(manager)
 
-	env, err := manager.GetVenv("test")
+	env, err := manager.GetVenv("test2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(env)
 
-	fut := env.Execute("test", "call", nil)
+	testCall(t, env)
+	testStream(t, env)
+	testGenerate(t, env)
+
+	<-ctx.Done()
+}
+
+func testCall(t *testing.T, env *python.VirtualEnv) {
+	params := make(map[string]proto.Object)
+	params["a"] = proto.NewLocalObject(10, proto.LangJson)
+	params["b"] = proto.NewLocalObject(2, proto.LangJson)
+	fut := env.Execute(nil, "__add", "call", params)
 	ret, err := fut.Result()
 	t.Log(ret, err)
-	<-ctx.Done()
+}
+
+func testStream(t *testing.T, env *python.VirtualEnv) {
+	ints := make(chan int)
+	go func() {
+		defer close(ints)
+		for i := 0; i < 10; i++ {
+			ints <- i
+		}
+	}()
+	params := make(map[string]proto.Object)
+	params["ints"] = proto.NewLocalStream(ints, proto.LangJson)
+	fut := env.Execute(nil, "__sum", "call", params)
+	ret, err := fut.Result()
+	t.Log(ret, err)
+}
+
+func testGenerate(t *testing.T, env *python.VirtualEnv) {
+	params := make(map[string]proto.Object)
+	params["n"] = proto.NewLocalObject(10, proto.LangJson)
+	fut := env.Execute(nil, "__generate", "call", params)
+	ret, _ := fut.Result()
+
+	s, _ := ret.ToStream()
+	for v := range s.ToChan(nil) {
+		t.Log(v)
+	}
 }
 
 func rpcClient() {

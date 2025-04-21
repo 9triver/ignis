@@ -37,7 +37,7 @@ func (cm *ConnectionManager) onReceive(router *goczmq.Channeler, frame []byte, m
 			router.SendChan <- [][]byte{frame, data}
 			return nil
 		})
-	case *executor.Message_Return:
+	case *executor.Message_Return, *executor.Message_StreamChunk, *executor.Message_StreamEnd:
 		e.Produce(msg)
 	}
 }

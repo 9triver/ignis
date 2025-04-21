@@ -1,57 +1,131 @@
-from typing import Any, NamedTuple
+import inspect
+import queue
 import sys
+import threading
+from collections.abc import Callable
+from typing import Any, NamedTuple, Iterable
 
 import zmq
 
 from ..protos import platform_pb2 as platform
 from ..protos.executor import executor_pb2 as executor
 from ..utils import EncDec, serde
+from ..utils.encdec import Streams
 
 
 class RemoteFunction(NamedTuple):
     language: platform.Language
-    methods: list[str]
-    obj: Any
+    fn: Callable[..., Any]
 
-    def call(self, method: str, **args):
-        if method == "":
-            return self.obj(**args)
+    def call(self, *args, **kwargs):
+        return self.fn(*args, **kwargs)
 
-        if method not in self.methods:
-            raise KeyError(f"No such method exposed {method}")
 
-        func = getattr(self.obj, method)
-        return func(**args)
+class _Add:
+    @staticmethod
+    def run(a: int, b: int) -> int:
+        return a + b
+
+
+class _Sum:
+    @staticmethod
+    def run(ints: Iterable[int]) -> int:
+        print(ints, file=sys.stderr)
+        s = 0
+        for i in ints:
+            s += i
+        return s
+
+
+class _Generate:
+    @staticmethod
+    def run(n: int) -> Iterable[int]:
+        for i in range(n):
+            yield i
 
 
 class Executor:
     def __init__(self, name: str = "__system") -> None:
         self.name = name
-        self.registries: dict[str, RemoteFunction] = {}
+        self.registries: dict[str, RemoteFunction] = {
+            # for debugging purpose
+            "__add": RemoteFunction(platform.LANG_JSON, _Add.run),
+            "__sum": RemoteFunction(platform.LANG_JSON, _Sum.run),
+            "__generate": RemoteFunction(platform.LANG_JSON, _Generate.run),
+        }
+        self.send_q = queue.Queue[executor.Message | None]()
 
-    def add_handler(self, cmd: executor.AddHandler) -> Any:
+    def on_add_handler(self, cmd: executor.AddHandler):
         obj = serde.loads(cmd.Handler)
-        self.registries[cmd.Name] = RemoteFunction(cmd.Language, list(cmd.Methods), obj)
-        return obj
+        if not callable(obj.run):
+            return
+        self.registries[cmd.Name] = RemoteFunction(cmd.Language, obj.run)
 
-    def remove_handler(self, cmd: executor.RemoveHandler):
+    def on_remove_handler(self, cmd: executor.RemoveHandler):
         if cmd.Name in self.registries:
             del self.registries[cmd.Name]
 
-    def execute(self, cmd: executor.Execute) -> executor.Return:
+    def on_execute(self, cmd: executor.Execute):
+        def do_stream(values: Iterable[Any]):
+            for obj in values:
+                print(obj, file=sys.stderr)
+                try:
+                    enc = EncDec.encode(obj, func.language)
+                    chunk = executor.StreamChunk(StreamID=cmd.CorrID, Value=enc)
+                except Exception as e:
+                    chunk = executor.StreamChunk(
+                        StreamID=cmd.CorrID, Error=f"{e.__class__.__name__}: {e}"
+                    )
+                print(
+                    f"sending stream chunk {chunk} of {chunk.StreamID}", file=sys.stderr
+                )
+                self.send_q.put(
+                    executor.Message(
+                        Conn=self.name,
+                        Type=executor.STREAM_CHUNK,
+                        StreamChunk=chunk,
+                    )
+                )
+
         try:
             args = {k: EncDec.decode(v) for k, v in cmd.Args.items()}
+            print(args, file=sys.stderr)
             func = self.registries[cmd.Name]
-            value = func.call(cmd.Method, **args)
-            return executor.Return(
-                CorrID=cmd.CorrID,
-                Value=EncDec.encode(value, func.language),
+            value = func.call(**args)
+            encoded = EncDec.encode(value, func.language)
+            msg = executor.Message(
+                Conn=self.name,
+                Type=executor.D_RETURN,
+                Return=executor.Return(
+                    CorrID=cmd.CorrID,
+                    Value=encoded,
+                ),
             )
+            print(f"sending back {msg}", file=sys.stderr)
+            self.send_q.put(msg)
+
+            if inspect.isgenerator(value):
+                do_stream(value)
         except Exception as e:
-            return executor.Return(
-                CorrID=cmd.CorrID,
-                Error=f"{e.__class__.__name__}: {e}",
+            self.send_q.put(
+                executor.Message(
+                    Conn=self.name,
+                    Type=executor.D_RETURN,
+                    Return=executor.Return(
+                        CorrID=cmd.CorrID,
+                        Error=f"{e.__class__.__name__}: {e}",
+                    ),
+                )
             )
+
+    @staticmethod
+    def on_stream_chunk(cmd: executor.StreamChunk):
+        obj = EncDec.decode(cmd.Value)
+        Streams.put(cmd.StreamID, obj)
+
+    @staticmethod
+    def on_stream_end(cmd: platform.EndOfStream):
+        Streams.close(cmd.StreamID)
 
     def loop(self, socket: zmq.SyncSocket):
         while True:
@@ -60,22 +134,35 @@ class Executor:
             match cmd.Type:
                 case executor.R_ADD_HANDLER:
                     print("receive add handler", file=sys.stderr)
-                    self.add_handler(cmd.AddHandler)
+                    self.on_add_handler(cmd.AddHandler)
                 case executor.R_REMOVE_HANDLER:
                     print("receive remove handler", file=sys.stderr)
-                    self.remove_handler(cmd.RemoveHandler)
+                    self.on_remove_handler(cmd.RemoveHandler)
                 case executor.R_EXECUTE:
                     print("receive execute", file=sys.stderr)
-                    ret = self.execute(cmd.Execute)
-                    msg = executor.Message(
-                        Conn=self.name, Type=executor.D_RETURN, Return=ret
-                    )
-                    print(f"sending back {msg}", file=sys.stderr)
-                    socket.send(msg.SerializeToString())
+                    threading.Thread(
+                        target=self.on_execute, args=(cmd.Execute,)
+                    ).start()
+                    # self.on_execute(cmd.Execute)
                 case executor.R_EXIT:
+                    self.send_q.put(None)
                     return
+                case executor.STREAM_CHUNK:
+                    print("receive chunk", file=sys.stderr)
+                    self.on_stream_chunk(cmd.StreamChunk)
+                case executor.STREAM_END:
+                    print("receive stream end", file=sys.stderr)
+                    self.on_stream_end(cmd.StreamEnd)
                 case _:
                     print("unknown command type, ignoring", file=sys.stderr)
+
+    def _start_send(self, socket: zmq.SyncSocket):
+        while True:
+            msg = self.send_q.get()
+            self.send_q.task_done()
+            if msg is None:
+                break
+            socket.send(msg.SerializeToString())
 
     def serve(self, ipc_addr: str):
         ctx = zmq.Context()
@@ -87,6 +174,8 @@ class Executor:
         socket.send(msg.SerializeToString())
 
         try:
+            t = threading.Thread(target=self._start_send, args=(socket,))
+            t.start()
             self.loop(socket)
         except Exception as e:
             print("executor stopped", e)

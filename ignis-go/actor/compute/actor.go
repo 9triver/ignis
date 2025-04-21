@@ -46,7 +46,8 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 		session = a.newSession(ctx, invoke.SessionID)
 	}
 
-	utils.GetObject(ctx, invoke.Value).OnDone(func(obj proto.Object, err error) {
+	flow := invoke.Value
+	flow.Get(ctx).OnDone(func(obj proto.Object, err error) {
 		if err != nil {
 			ctx.Logger().Error("fetch failed",
 				"a", a.name,
