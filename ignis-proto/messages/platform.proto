@@ -1,43 +1,72 @@
 syntax = "proto3";
 package proto;
-option go_package = "actors/proto";
+option go_package = "github.com/9triver/ignis/proto";
 
 import "actor.proto";
 
+// Language of supported object
 enum Language {
   LANG_UNKNOWN = 0;
-  LANG_JSON = 1;
-  LANG_GO = 2;
-  LANG_PYTHON = 3;
+  LANG_JSON = 1; // Values that can be represented as JSON string, can be encoded/decoded
+  LANG_GO = 2; // Values that are only compatible with Go actors.
+  LANG_PYTHON = 3; // Values that are only compatible with Python actors.
 }
 
-message ObjectRequest {
-  actor.PID Sender = 1;
-  string ID = 2;
-}
-
-message EncodedObject {
-  string ID = 1; // if returned from ipc call, id won't be set 
-  bytes Data = 2;
-  Language Language = 3;
-}
-
+// Flow is reference to real object or stream
 message Flow {
-  actor.PID Actor = 1;
-  string ObjectID = 2;
+  string ObjectID = 1; // ID of referenced object or stream
+  actor.PID Source = 2; // points to store actor of a single worker.
 }
 
+// EncodedObject stores a byte encoded object
+message EncodedObject {
+  string ID = 1; // if returned from ipc call, id won't be set
+  bytes Data = 2; // serialized object data, or nil if current object is a stream
+  actor.PID Source = 3; // points to store actor of the stream.
+  Language Language = 4; // if is JSON, it can be decoded to either Go, Python, or else it can only be decoded to corresponding language.
+  bool Stream = 5; // mark if the object is a stream
+}
+
+// ObjectRequest requests object with ID, and the object is sent to ReplyTo, asynchronously.
+// if the object is a stream, the stream **object** is sent to ReplyTo by ObjectRequest,
+// but no real stream chunk is transmitted.
+message ObjectRequest {
+  string ID = 1;
+  actor.PID ReplyTo = 2;
+}
+
+// StreamRequest requests stream with ID, and the stream **content** is sent to ReplyTo by StreamChunks,
+// ending with StreamEnd message.
+message StreamRequest {
+  string StreamID = 1;
+  actor.PID ReplyTo = 2;
+}
+
+message StreamChunk {
+  string StreamID = 1;
+  oneof Chunk {
+    EncodedObject Value = 2;
+    string Error = 3;
+  }
+}
+
+message StreamEnd {
+  string StreamID = 1; // ID of requested stream
+}
+
+// Generic Error message for platform
 message Error {
   actor.PID Sender = 1;
   string Message = 2;
 }
 
-message Ack {
-  actor.PID Sender = 1;
+// Invoke is sent to a dag node for workflow execution.
+message Invoke {
+  string SessionID = 1;
+  string Param = 2;
+  Flow Value = 3;
+  string Error = 4;
 }
 
-message Execute {
-  string ExecutionID = 1;
-  map<string, Flow> Flows = 2;
-  actor.PID ReplyTo = 3;
-}
+// InvokeEmpty is sent to entry nodes of the dag.
+message InvokeEmpty {}
