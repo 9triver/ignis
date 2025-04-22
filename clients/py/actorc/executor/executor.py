@@ -66,65 +66,50 @@ class Executor:
             del self.registries[cmd.Name]
 
     def on_execute(self, cmd: executor.Execute):
-        def do_stream(values: Iterable[Any]):
-            for obj in values:
-                print(obj, file=sys.stderr)
-                try:
-                    enc = EncDec.encode(obj, func.language)
-                    chunk = executor.StreamChunk(StreamID=cmd.CorrID, Value=enc)
-                except Exception as e:
-                    chunk = executor.StreamChunk(
-                        StreamID=cmd.CorrID, Error=f"{e.__class__.__name__}: {e}"
-                    )
-                print(
-                    f"sending stream chunk {chunk} of {chunk.StreamID}", file=sys.stderr
+        def send_chunk(obj: Any):
+            try:
+                enc = EncDec.encode(obj, func.language)
+                chunk = platform.StreamChunk(StreamID=cmd.CorrID, Value=enc)
+            except Exception as ex:
+                chunk = platform.StreamChunk(
+                    StreamID=cmd.CorrID, Error=f"{ex.__class__.__name__}: {ex}"
                 )
-                self.send_q.put(
-                    executor.Message(
-                        Conn=self.name,
-                        Type=executor.STREAM_CHUNK,
-                        StreamChunk=chunk,
-                    )
-                )
+            print(f"sending stream chunk {chunk} of {chunk.StreamID}", file=sys.stderr)
+            msg = executor.Message(
+                Conn=self.name, Type=executor.STREAM_CHUNK, StreamChunk=chunk
+            )
+            self.send_q.put(msg)
 
         try:
             args = {k: EncDec.decode(v) for k, v in cmd.Args.items()}
-            print(args, file=sys.stderr)
             func = self.registries[cmd.Name]
             value = func.call(**args)
             encoded = EncDec.encode(value, func.language)
-            msg = executor.Message(
-                Conn=self.name,
-                Type=executor.D_RETURN,
-                Return=executor.Return(
-                    CorrID=cmd.CorrID,
-                    Value=encoded,
-                ),
-            )
-            print(f"sending back {msg}", file=sys.stderr)
+            ret = executor.Return(CorrID=cmd.CorrID, Value=encoded)
+            msg = executor.Message(Conn=self.name, Type=executor.D_RETURN, Return=ret)
             self.send_q.put(msg)
 
             if inspect.isgenerator(value):
-                do_stream(value)
-        except Exception as e:
-            self.send_q.put(
-                executor.Message(
-                    Conn=self.name,
-                    Type=executor.D_RETURN,
-                    Return=executor.Return(
-                        CorrID=cmd.CorrID,
-                        Error=f"{e.__class__.__name__}: {e}",
-                    ),
+                for obj in value:
+                    send_chunk(obj)
+                eos = platform.StreamEnd(StreamID=cmd.CorrID)
+                msg = executor.Message(
+                    Conn=self.name, Type=executor.STREAM_END, StreamEnd=eos
                 )
-            )
+                self.send_q.put(msg)
+        except Exception as e:
+            err = f"{e.__class__.__name__}: {e}"
+            ret = executor.Return(CorrID=cmd.CorrID, Error=err)
+            msg = executor.Message(Conn=self.name, Type=executor.D_RETURN, Return=ret)
+            self.send_q.put(msg)
 
     @staticmethod
-    def on_stream_chunk(cmd: executor.StreamChunk):
+    def on_stream_chunk(cmd: platform.StreamChunk):
         obj = EncDec.decode(cmd.Value)
         Streams.put(cmd.StreamID, obj)
 
     @staticmethod
-    def on_stream_end(cmd: platform.EndOfStream):
+    def on_stream_end(cmd: platform.StreamEnd):
         Streams.close(cmd.StreamID)
 
     def loop(self, socket: zmq.SyncSocket):

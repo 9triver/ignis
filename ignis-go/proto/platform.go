@@ -14,6 +14,31 @@ const (
 	LangPython  = Language_LANG_PYTHON
 )
 
+type Successor struct {
+	ID    string
+	Param string
+	PID   *actor.PID
+}
+
+type CreateSession struct {
+	SessionID  string
+	Successors []*Successor
+}
+
+func NewStreamChunk(streamId string, value *EncodedObject, err error) *StreamChunk {
+	cmd := &StreamChunk{StreamID: streamId}
+	if err != nil {
+		cmd.Chunk = &StreamChunk_Error{Error: err.Error()}
+	} else {
+		cmd.Chunk = &StreamChunk_Value{Value: value}
+	}
+	return cmd
+}
+
+func NewStreamEnd(streamId string) *StreamEnd {
+	return &StreamEnd{StreamID: streamId}
+}
+
 func (flow *Flow) Get(ctx actor.Context) utils.Future[Object] {
 	fut := utils.NewFuture[Object](configs.FlowTimeout)
 	if flow == nil {

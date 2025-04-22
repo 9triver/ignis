@@ -64,17 +64,12 @@ func NewReturn(conn, corrId string, value *proto.EncodedObject, err error) *Mess
 }
 
 func NewStreamChunk(conn, streamId string, value *proto.EncodedObject, err error) *Message {
-	cmd := &StreamChunk{StreamID: streamId}
-	if err != nil {
-		cmd.Chunk = &StreamChunk_Error{Error: err.Error()}
-	} else {
-		cmd.Chunk = &StreamChunk_Value{Value: value}
-	}
+	cmd := proto.NewStreamChunk(streamId, value, err)
 	return NewMessage(conn, cmd)
 }
 
 func NewStreamEnd(conn, streamId string) *Message {
-	cmd := &proto.EndOfStream{StreamID: streamId}
+	cmd := proto.NewStreamEnd(streamId)
 	return NewMessage(conn, cmd)
 }
 
@@ -99,10 +94,10 @@ func NewMessage(conn string, cmd pb.Message) *Message {
 	case *Return:
 		ret.Type = CommandType_D_RETURN
 		ret.Command = &Message_Return{Return: cmd}
-	case *StreamChunk:
+	case *proto.StreamChunk:
 		ret.Type = CommandType_STREAM_CHUNK
 		ret.Command = &Message_StreamChunk{StreamChunk: cmd}
-	case *proto.EndOfStream:
+	case *proto.StreamEnd:
 		ret.Type = CommandType_STREAM_END
 		ret.Command = &Message_StreamEnd{StreamEnd: cmd}
 	default:

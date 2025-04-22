@@ -23,27 +23,27 @@ func (a *Actor) Deps() utils.Set[string] {
 	return a.executor.Deps()
 }
 
-func (a *Actor) newSession(ctx actor.Context, sessionId string) *actor.PID {
-	ctx.Logger().Info("create session", "actor", a.name, "session", sessionId)
-	props := NewSession(sessionId, a.store, a.executor, a.Deps())
+func (a *Actor) newSession(ctx actor.Context, sessionId string, successors []*proto.Successor) *actor.PID {
+	ctx.Logger().Info("compute: create session", "actor", a.name, "session", sessionId)
+	props := NewSession(sessionId, a.store, a.executor, a.Deps(), successors)
 	session, _ := ctx.SpawnNamed(props, sessionId)
 	a.sessions.Put(sessionId, session)
 	return session
 }
 
 func (a *Actor) onCreateSession(ctx actor.Context, create *proto.CreateSession) {
-	session, ok := a.sessions.Get(create.SessionID)
-	if !ok {
-		session = a.newSession(ctx, create.SessionID)
+	if _, ok := a.sessions[create.SessionID]; ok {
+		ctx.Logger().Warn("compute: session exists, ignoring", "actor", a.name, "session", create.SessionID)
+		return
 	}
-
-	ctx.Send(session, &proto.AppendSuccessors{Successors: create.Successors})
+	a.sessions[create.SessionID] = a.newSession(ctx, create.SessionID, create.Successors)
 }
 
 func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 	session, ok := a.sessions.Get(invoke.SessionID)
 	if !ok {
-		session = a.newSession(ctx, invoke.SessionID)
+		ctx.Logger().Error("compute: session not found", "actor", a.name, "session", invoke.SessionID)
+		return
 	}
 
 	flow := invoke.Value

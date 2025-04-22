@@ -46,14 +46,6 @@ message Return {
   }
 }
 
-message StreamChunk {
-  string StreamID = 1;
-  oneof Chunk {
-    proto.EncodedObject Value = 2;
-    string Error = 3;
-  }
-}
-
 message Message {
   string Conn = 1;
   CommandType Type = 2;
@@ -64,8 +56,8 @@ message Message {
     Exit Exit = 6;
     Ready Ready = 7;
     Return Return = 8;
-    StreamChunk StreamChunk = 9;
-    proto.EndOfStream StreamEnd = 10;
+    proto.StreamChunk StreamChunk = 9;
+    proto.StreamEnd StreamEnd = 10;
   }
 }
 

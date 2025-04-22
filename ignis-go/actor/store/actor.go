@@ -11,6 +11,7 @@ import (
 
 type Actor struct {
 	name    string
+	sender  Sender
 	objects map[string]proto.Object
 }
 
@@ -40,7 +41,7 @@ func (s *Actor) responseObject(ctx actor.Context, req *proto.ObjectRequest, obj 
 }
 
 func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
-	ctx.Logger().Info("request object",
+	ctx.Logger().Info("responding object",
 		"id", req.ID,
 	)
 
@@ -57,7 +58,7 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 }
 
 func (s *Actor) onStreamRequest(ctx actor.Context, req *proto.StreamRequest) {
-	ctx.Logger().Info("request stream",
+	ctx.Logger().Info("store: responding stream",
 		"id", req.StreamID,
 	)
 
@@ -78,19 +79,12 @@ func (s *Actor) onStreamRequest(ctx actor.Context, req *proto.StreamRequest) {
 		return
 	}
 
-	objects := stream.ToChan(ctx)
 	go func() {
-		defer ctx.Send(req.ReplyTo, &proto.EndOfStream{})
+		defer ctx.Send(req.ReplyTo, proto.NewStreamEnd(req.StreamID))
+		objects := stream.ToChan(ctx)
 		for obj := range objects {
-			var msg any
-			if encoded, err := obj.GetEncoded(); err != nil {
-				msg = &proto.Error{
-					Sender:  ctx.Self(),
-					Message: fmt.Sprintf("request %s: %s", req.StreamID, err.Error()),
-				}
-			} else {
-				msg = &proto.StreamChunk{StreamID: req.StreamID, Object: encoded}
-			}
+			encoded, err := obj.GetEncoded()
+			msg := proto.NewStreamChunk(req.StreamID, encoded, err)
 			ctx.Send(req.ReplyTo, msg)
 		}
 	}()
@@ -98,7 +92,7 @@ func (s *Actor) onStreamRequest(ctx actor.Context, req *proto.StreamRequest) {
 
 func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
 	obj := save.Value
-	ctx.Logger().Info("save object",
+	ctx.Logger().Info("store: save object",
 		"id", obj.GetID(),
 	)
 

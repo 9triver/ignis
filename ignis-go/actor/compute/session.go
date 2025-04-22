@@ -11,13 +11,12 @@ import (
 )
 
 type Session struct {
-	id           string
-	store        *actor.PID
-	executor     *Executor
-	deps         utils.Set[string]
-	params       map[string]proto.Object
-	successors   []*proto.Successor
-	successorSet bool
+	id         string
+	store      *actor.PID
+	executor   *Executor
+	deps       utils.Set[string]
+	params     map[string]proto.Object
+	successors []*proto.Successor
 }
 
 type SessionInvoke struct {
@@ -53,18 +52,6 @@ func (s *Session) doInvoke(ctx actor.Context) {
 	s.executor.Requests() <- exec
 }
 
-func (s *Session) onSuccessors(ctx actor.Context, successors *proto.AppendSuccessors) {
-	if s.successorSet {
-		return
-	}
-	ctx.Logger().Info("session updates successors", "session", s.id)
-	s.successors = successors.Successors
-	s.successorSet = true
-	if s.ready() {
-		s.doInvoke(ctx)
-	}
-}
-
 func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
 	if invoke.Value == nil {
 		return
@@ -86,7 +73,7 @@ func (s *Session) enqueue(param string, obj proto.Object) {
 }
 
 func (s *Session) ready() bool {
-	return s.successorSet && s.deps.Empty()
+	return s.deps.Empty()
 }
 
 func (s *Session) sendError(ctx actor.Context, err error) {
@@ -111,8 +98,6 @@ func (s *Session) sendResult(ctx actor.Context, obj *proto.Flow) {
 
 func (s *Session) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *proto.AppendSuccessors:
-		s.onSuccessors(ctx, msg)
 	case *SessionInvoke:
 		s.onInvoke(ctx, msg)
 	case *actor.Stop:
@@ -127,6 +112,7 @@ func NewSession(
 	store *actor.PID,
 	executor *Executor,
 	deps utils.Set[string],
+	successors []*proto.Successor,
 ) *actor.Props {
 	return actor.PropsFromProducer(func() actor.Actor {
 		return &Session{
@@ -135,7 +121,7 @@ func NewSession(
 			executor:   executor,
 			deps:       deps.Copy(),
 			params:     make(map[string]proto.Object),
-			successors: nil,
+			successors: successors,
 		}
 	})
 }

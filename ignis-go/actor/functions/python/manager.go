@@ -49,15 +49,6 @@ func (m *VenvManager) ExecutorManager() remote.ExecutorManager {
 	return m.em
 }
 
-//func (m *VenvManager) Addr() string {
-//	switch m.em.Type() {
-//	case remote.IPC:
-//		return "ipc://" + path.Join(venvPath, "__python_ipc")
-//	default:
-//		panic("not implemented")
-//	}
-//}
-
 func (m *VenvManager) addVenv(venv *VirtualEnv) {
 	m.Envs[venv.Name] = venv
 }

@@ -51,13 +51,13 @@ func (obj *EncodedObject) ToChan(ctx actor.Context) <-chan Object {
 	values := make(chan Object)
 	props := actor.PropsFromFunc(func(c actor.Context) {
 		switch o := c.Message().(type) {
-		case *EndOfStream:
+		case *StreamEnd:
 			close(values)
 		case *StreamChunk:
 			if o.StreamID != obj.ID {
 				return
 			}
-			values <- o.Object
+			values <- o.GetValue()
 		}
 	})
 

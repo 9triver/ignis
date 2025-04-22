@@ -121,18 +121,18 @@ func (v *VirtualEnv) onReturn(ret *executor.Return) {
 	}
 
 	var o proto.Object
-	if obj.Data != nil { // return a stream from python
-		o = obj
-	} else {
+	if obj.Stream { // return a stream from python
 		values := make(chan proto.Object)
 		ls := proto.NewLocalStream(values, obj.GetLanguage())
 		v.streams[ret.CorrID] = ls
 		o = ls
+	} else {
+		o = obj
 	}
 	fut.Resolve(o)
 }
 
-func (v *VirtualEnv) onStreamChunk(chunk *executor.StreamChunk) {
+func (v *VirtualEnv) onStreamChunk(chunk *proto.StreamChunk) {
 	stream, ok := v.streams[chunk.StreamID]
 	if !ok {
 		return
@@ -145,7 +145,7 @@ func (v *VirtualEnv) onStreamChunk(chunk *executor.StreamChunk) {
 	}
 }
 
-func (v *VirtualEnv) onStreamEnd(end *proto.EndOfStream) {
+func (v *VirtualEnv) onStreamEnd(end *proto.StreamEnd) {
 	stream, ok := v.streams[end.StreamID]
 	if !ok {
 		return
