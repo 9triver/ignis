@@ -18,7 +18,7 @@ class RemoteFunction(NamedTuple):
     fn: Callable[..., Any]
 
     def call(self, *args, **kwargs):
-        return self.fn(*args, **kwargs)
+        return self.fn(kwargs)
 
 
 class _DebugFuncs:
@@ -59,9 +59,9 @@ class Executor:
 
     def on_add_handler(self, cmd: executor.AddHandler):
         obj = serde.loads(cmd.Handler)
-        if not callable(obj.run):
+        if not callable(obj):
             return
-        self.registries[cmd.Name] = RemoteFunction(cmd.Language, obj.run)
+        self.registries[cmd.Name] = RemoteFunction(cmd.Language, obj)
 
     def on_remove_handler(self, cmd: executor.RemoveHandler):
         if cmd.Name in self.registries:
@@ -83,6 +83,7 @@ class Executor:
             self.send_q.put(msg)
 
         try:
+            print(cmd.Args, file=sys.stderr)
             args = {k: EncDec.decode(v) for k, v in cmd.Args.items()}
             func = self.registries[cmd.Name]
             value = func.call(**args)

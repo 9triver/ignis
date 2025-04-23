@@ -45,11 +45,15 @@ class Streams:
 
     @classmethod
     def put(cls, name: str, obj: Any):
+        if name not in cls.streams:
+            return
         print(f"put {obj} to {name}", file=sys.stderr)
         cls.streams[name].put(obj)
 
     @classmethod
     def close(cls, name: str):
+        if name not in cls.streams:
+            return
         print(f"close {name}", file=sys.stderr)
         cls.streams[name].put(None)
 
@@ -65,13 +69,14 @@ class EncDec:
             return Streams.register(obj.ID)
 
         data = obj.Data
+        print(obj.Language, file=sys.stderr)
         match obj.Language:
             case platform.LANG_PYTHON:
                 return cloudpickle.loads(data)
             case platform.LANG_JSON:
                 return json.loads(data)
             case _:
-                raise ValueError(f"unsupported language {obj.Language}")
+                raise ValueError(f"dec: unsupported language {obj.Language}")
 
     @staticmethod
     def decode_dict(obj: EncodedObject):
@@ -82,7 +87,7 @@ class EncDec:
             case platform.LANG_JSON:
                 return json.loads(data)
             case _:
-                raise ValueError(f"unsupported language {lang}")
+                raise ValueError(f"dec: unsupported language {lang}")
 
     @classmethod
     def encode(
@@ -100,5 +105,5 @@ class EncDec:
             case platform.LANG_JSON:
                 data = json.dumps(obj).encode()
             case _:
-                raise ValueError(f"unsupported language {language}")
+                raise ValueError(f"enc: unsupported language {language}")
         return platform.EncodedObject(ID=cls.next_id(), Data=data, Language=language)

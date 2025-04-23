@@ -14,16 +14,16 @@ import (
 )
 
 func TestVenvExecutor(t *testing.T) {
-	cm := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
+	em := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	go func() {
-		if err := cm.Run(ctx); err != nil {
+		if err := em.Run(ctx); err != nil {
 		}
 	}()
 
-	manager, err := python.NewManager(ctx, cm)
+	manager, err := python.NewManager(ctx, em)
 	if err != nil {
 		t.Fatal(err)
 	}
