@@ -1,33 +1,25 @@
 package configs
 
 import (
-	"github.com/9triver/ignis/utils/errors"
 	"os"
 	"path"
 	"time"
+
+	"github.com/9triver/ignis/utils/errors"
 )
 
 const (
-	// Timeouts for platform futures
-	kDefaultSystemTimeout    = 30 * time.Second
-	kDefaultExecutionTimeout = 300 * time.Second
-
-	// Values
-	kDefaultChannelBufferSize  = 50
-	kDefaultMaximumMessageSize = 4 * 1024 * 1024
-
-	LatencyNotSpecified time.Duration = 1 * time.Millisecond // unspecified latency, default to 1ms
-	LatencyZero         time.Duration = 0                    // never updates latency
+	kDefaultSystemTimeout     = 30 * time.Second
+	kDefaultExecutionTimeout  = 300 * time.Second
+	kDefaultChannelBufferSize = 16
 
 	AppName = "actor-platform"
 )
 
 var (
-	RequestTimeout     = kDefaultSystemTimeout    // system requests
-	FlowTimeout        = kDefaultSystemTimeout    // flow object requests
-	ExecutionTimeout   = kDefaultExecutionTimeout // actor execution
-	ChannelBufferSize  = kDefaultChannelBufferSize
-	MaximumMessageSize = kDefaultMaximumMessageSize
+	FlowTimeout       = kDefaultSystemTimeout    // flow object requests
+	ExecutionTimeout  = kDefaultExecutionTimeout // actor execution
+	ChannelBufferSize = kDefaultChannelBufferSize
 )
 
 var StoragePath = func() string {

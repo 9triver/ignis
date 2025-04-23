@@ -2,7 +2,6 @@ package actor_test
 
 import (
 	"context"
-	"github.com/9triver/ignis/utils"
 	"log/slog"
 	"path"
 	"testing"
@@ -20,8 +19,10 @@ import (
 	"github.com/9triver/ignis/actor/remote/rpc"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/configs"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
+	"github.com/9triver/ignis/utils"
 )
 
 func rpcClient(storePID, computePID *actor.PID) {
@@ -52,13 +53,16 @@ func rpcClient(storePID, computePID *actor.PID) {
 
 	err = stream.Send(controller.NewAppendArgFromRef("session-0", "instance-0", "func", "A", &proto.Flow{
 		ObjectID: "obj-1",
-		Source:   storePID,
+		Source: &proto.StoreRef{
+			ID:  "store",
+			PID: storePID,
+		},
 	}))
 	if err != nil {
 		panic(err)
 	}
 
-	encoded, _ := proto.NewLocalObject(10, proto.LangJson).GetEncoded()
+	encoded, _ := messages.NewLocalObject(10, proto.LangJson).GetEncoded()
 	err = stream.Send(controller.NewAppendArgFromEncoded("session-0", "instance-0", "func", "B", encoded))
 	if err != nil {
 		panic(err)
@@ -85,10 +89,17 @@ func TestRemoteTask(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	storeProps := store.New()
+	storeProps := store.New(nil, "store")
 	storePID := sys.Root.Spawn(storeProps)
 
-	taskFunc := functions.NewGo("graph-task", demoFunc, proto.LangJson)
+	type Input struct {
+		A int
+		B int
+	}
+
+	taskFunc := functions.NewGo("graph-task", func(args Input) (ret int, err error) {
+		return args.A + args.B, nil
+	}, proto.LangJson)
 	computePID := sys.Root.Spawn(compute.NewActor("graph-task", taskFunc, storePID))
 
 	go func() {
@@ -110,11 +121,11 @@ func TestRemoteTask(t *testing.T) {
 		}
 	}()
 
-	<-time.After(10 * time.Second)
+	<-time.After(30 * time.Second)
 }
 
 func TestRemoteStream(t *testing.T) {
-	storeProps := store.New()
+	storeProps := store.New(nil, "store")
 	sys := actor.NewActorSystem(actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
 		logger := utils.Logger()
 		return logger.With("system", system.ID)
@@ -162,9 +173,9 @@ func TestRemoteStream(t *testing.T) {
 	pid1 := sys.Root.Spawn(props1)
 	pid2 := sys.Root.Spawn(props2)
 
-	sys.Root.Send(pid1, &proto.CreateSession{
+	sys.Root.Send(pid1, &messages.CreateSession{
 		SessionID: "test",
-		Successors: []*proto.Successor{
+		Successors: []*messages.Successor{
 			{
 				ID:    "f2",
 				Param: "Ints",
@@ -173,13 +184,13 @@ func TestRemoteStream(t *testing.T) {
 		},
 	})
 
-	sys.Root.Send(pid2, &proto.CreateSession{
+	sys.Root.Send(pid2, &messages.CreateSession{
 		SessionID:  "test",
-		Successors: []*proto.Successor{},
+		Successors: []*messages.Successor{},
 	})
 
 	sys.Root.Send(storePID, &store.SaveObject{
-		Value: proto.NewLocalObject(10, proto.LangJson),
+		Value: messages.NewLocalObject(10, proto.LangJson),
 		Callback: func(ctx actor.Context, ref *proto.Flow) {
 			ctx.Send(pid1, &proto.Invoke{
 				SessionID: "test",

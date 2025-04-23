@@ -2,12 +2,14 @@ package remote
 
 import (
 	"context"
+	"time"
+
+	pb "google.golang.org/protobuf/proto"
+
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils/errors"
-	pb "google.golang.org/protobuf/proto"
-	"time"
 )
 
 type StreamImpl[I, O pb.Message] struct {

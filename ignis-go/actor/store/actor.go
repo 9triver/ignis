@@ -1,93 +1,131 @@
 package store
 
 import (
-	"fmt"
-	"github.com/9triver/ignis/utils"
-
 	"github.com/asynkron/protoactor-go/actor"
 
+	"github.com/9triver/ignis/configs"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/utils"
+	"github.com/9triver/ignis/utils/errors"
 )
 
 type Actor struct {
-	name    string
-	sender  Sender
-	objects map[string]proto.Object
+	id   string
+	ref  *proto.StoreRef
+	stub Stub
+	// localObjects saves objects generated from current system
+	localObjects map[string]messages.Object
+	// remoteObjects saves objects from remote stores
+	remoteObjects map[string]utils.Future[messages.Object]
 }
 
 // SaveObject is sent to store when actor generates new return objects from functions
 type SaveObject struct {
-	Value    proto.Object                             // object or stream
+	Value    messages.Object                          // object or stream
 	Callback func(ctx actor.Context, ref *proto.Flow) // called when object saving is completed
 }
 
-func (s *Actor) Name() string {
-	return s.name
+// RequestObject is sent to store by **local** actors
+type RequestObject struct {
+	ReplyTo *actor.PID
+	Flow    *proto.Flow
 }
 
-func (s *Actor) responseObject(ctx actor.Context, req *proto.ObjectRequest, obj proto.Object) {
-	var reply any
-	if utils.IsSameSystem(ctx.Self(), req.ReplyTo) {
-		reply = obj
-	} else if encoded, err := obj.GetEncoded(); err != nil {
-		reply = &proto.Error{
-			Sender:  ctx.Self(),
-			Message: fmt.Sprintf("request %s: %s", req.ID, err.Error()),
-		}
-	} else {
-		reply = encoded
-	}
-	ctx.Send(req.ReplyTo, reply)
+// ObjectResponse is sent to request actor
+type ObjectResponse struct {
+	Value messages.Object
+	Error error
+}
+
+func (s *Actor) ID() string {
+	return s.id
 }
 
 func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 	ctx.Logger().Info("responding object",
 		"id", req.ID,
+		"replyTo", req.ReplyTo.ID,
 	)
 
-	obj, ok := s.objects[req.ID]
+	reply := &proto.ObjectResponse{ID: req.ID}
+	obj, ok := s.localObjects[req.ID]
 	if !ok {
-		ctx.Send(req.ReplyTo, &proto.Error{
-			Sender:  ctx.Self(),
-			Message: fmt.Sprintf("request %s: no such object", req.ID),
-		})
-		return
+		reply.Error = errors.Format("store: object %s not found", req.ID).Error()
+	} else if encoded, err := obj.GetEncoded(); err != nil {
+		reply.Error = errors.WrapWith(err, "store: object %s encode failed", req.ID).Error()
+	} else {
+		reply.Value = encoded
 	}
+	s.stub.SendTo(req.ReplyTo, reply)
 
-	s.responseObject(ctx, req, obj)
+	// if requested object is a stream, send all chunks
+	if stream, ok := obj.(*messages.LocalStream); ok {
+		eos := proto.NewStreamEnd(req.ID)
+		go func() {
+			defer s.stub.SendTo(req.ReplyTo, eos)
+			objects := stream.ToChan()
+			for obj := range objects {
+				encoded, err := obj.GetEncoded()
+				msg := proto.NewStreamChunk(req.ID, encoded, err)
+				s.stub.SendTo(req.ReplyTo, msg)
+			}
+		}()
+	}
 }
 
-func (s *Actor) onStreamRequest(ctx actor.Context, req *proto.StreamRequest) {
-	ctx.Logger().Info("store: responding stream",
-		"id", req.StreamID,
+func (s *Actor) onObjectResponse(ctx actor.Context, resp *proto.ObjectResponse) {
+	if resp.Error != "" {
+		ctx.Logger().Error("store: object response error",
+			"id", resp.ID,
+			"error", resp.Error,
+		)
+		return
+	}
+
+	ctx.Logger().Info("store: receive object response",
+		"id", resp.ID,
 	)
 
-	obj, ok := s.objects[req.StreamID]
+	fut, ok := s.remoteObjects[resp.ID]
 	if !ok {
-		ctx.Send(req.ReplyTo, &proto.Error{
-			Sender:  ctx.Self(),
-			Message: fmt.Sprintf("request %s: no such stream", req.StreamID),
-		})
-		return
-	}
-	stream, ok := obj.ToStream()
-	if !ok {
-		ctx.Send(req.ReplyTo, &proto.Error{
-			Sender:  ctx.Self(),
-			Message: fmt.Sprintf("request %s: no such stream", req.StreamID),
-		})
 		return
 	}
 
-	go func() {
-		defer ctx.Send(req.ReplyTo, proto.NewStreamEnd(req.StreamID))
-		objects := stream.ToChan(ctx)
-		for obj := range objects {
-			encoded, err := obj.GetEncoded()
-			msg := proto.NewStreamChunk(req.StreamID, encoded, err)
-			ctx.Send(req.ReplyTo, msg)
-		}
-	}()
+	encoded := resp.Value
+	if !encoded.Stream {
+		fut.Resolve(encoded)
+	} else {
+		ls := messages.NewLocalStream(nil, encoded.Language)
+		fut.Resolve(ls)
+	}
+}
+
+func (s *Actor) onStreamChunk(ctx actor.Context, chunk *proto.StreamChunk) {
+	ctx.Logger().Info("store: receive stream chunk",
+		"stream", chunk.StreamID,
+		"isEos", chunk.EoS,
+	)
+	fut, ok := s.remoteObjects[chunk.StreamID]
+	if !ok {
+		return
+	}
+
+	obj, err := fut.Result()
+	if err != nil {
+		return
+	}
+
+	stream, ok := obj.(*messages.LocalStream)
+	if !ok {
+		return
+	}
+
+	if chunk.EoS {
+		stream.EnqueueChunk(nil)
+	} else {
+		stream.EnqueueChunk(chunk.Value)
+	}
 }
 
 func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
@@ -96,32 +134,127 @@ func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
 		"id", obj.GetID(),
 	)
 
-	if stream, ok := obj.(*proto.LocalStream); ok {
-		stream.SetRemote(ctx.Self())
+	if stream, ok := obj.(*messages.LocalStream); ok {
+		stream.SetRemote(s.ref)
 	}
 
-	s.objects[obj.GetID()] = obj
+	s.localObjects[obj.GetID()] = obj
 
 	if save.Callback != nil {
-		save.Callback(ctx, &proto.Flow{ObjectID: obj.GetID(), Source: ctx.Self()})
+		save.Callback(ctx, &proto.Flow{ObjectID: obj.GetID(), Source: s.ref})
+	}
+}
+
+func (s *Actor) getLocalObject(flow *proto.Flow) (messages.Object, error) {
+	obj, ok := s.localObjects[flow.ObjectID]
+	if !ok {
+		return nil, errors.Format("store: flow %s not found", flow.ObjectID)
+	}
+	return obj, nil
+}
+
+func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[messages.Object] {
+	if fut, ok := s.remoteObjects[flow.ObjectID]; ok {
+		return fut
+	}
+
+	fut := utils.NewFuture[messages.Object](configs.FlowTimeout)
+	s.remoteObjects[flow.ObjectID] = fut
+
+	remoteRef := flow.Source
+	s.stub.SendTo(remoteRef, &proto.ObjectRequest{
+		ID:      flow.ObjectID,
+		ReplyTo: s.ref,
+	})
+	return fut
+}
+
+func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
+	ctx.Logger().Info("store: local flow request",
+		"id", req.Flow.ObjectID,
+		"store", req.Flow.Source.ID,
+	)
+
+	if req.Flow.Source.ID == s.ref.ID {
+		obj, err := s.getLocalObject(req.Flow)
+		ctx.Send(req.ReplyTo, &ObjectResponse{
+			Value: obj,
+			Error: err,
+		})
+	} else {
+		s.requestRemoteObject(req.Flow).OnDone(func(obj messages.Object, err error) {
+			ctx.Send(req.ReplyTo, &ObjectResponse{
+				Value: obj,
+				Error: err,
+			})
+		})
 	}
 }
 
 func (s *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
+	// Requests from remote stores
 	case *proto.ObjectRequest:
 		s.onObjectRequest(ctx, msg)
-	case *proto.StreamRequest:
-		s.onStreamRequest(ctx, msg)
+	// Responses from remote stores
+	case *proto.ObjectResponse:
+		s.onObjectResponse(ctx, msg)
+	case *proto.StreamChunk:
+		s.onStreamChunk(ctx, msg)
+	// Local actor requests
 	case *SaveObject:
 		s.onSaveObject(ctx, msg)
+	case *RequestObject:
+		s.onFlowRequest(ctx, msg)
 	}
 }
 
-func New() *actor.Props {
+func New(stub Stub, id string) *actor.Props {
+	s := &Actor{
+		id:            id,
+		stub:          stub,
+		localObjects:  make(map[string]messages.Object),
+		remoteObjects: make(map[string]utils.Future[messages.Object]),
+	}
 	return actor.PropsFromProducer(func() actor.Actor {
-		return &Actor{
-			objects: make(map[string]proto.Object),
+		return s
+	}, actor.WithOnInit(func(ctx actor.Context) {
+		s.ref = &proto.StoreRef{ID: id, PID: ctx.Self()}
+	}))
+}
+
+// GetObject can be called by actors within the same system
+// It returns a future that resolves to the object or rejects with an error
+func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Future[messages.Object] {
+	fut := utils.NewFuture[messages.Object](configs.FlowTimeout)
+	if flow == nil {
+		fut.Reject(errors.New("flow is nil"))
+		return fut
+	}
+
+	props := actor.PropsFromFunc(func(c actor.Context) {
+		switch msg := c.Message().(type) {
+		case *ObjectResponse:
+			if msg.Error != nil {
+				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ObjectID))
+				return
+			}
+
+			if msg.Value.GetID() != flow.ObjectID {
+				err := errors.Format("flow %s received unexpected ID %s", flow.ObjectID, msg.Value.GetID())
+				fut.Reject(err)
+				return
+			}
+
+			fut.Resolve(msg.Value)
 		}
 	})
+
+	flowActor := ctx.Spawn(props)
+	ctx.Send(store, &RequestObject{
+		ReplyTo: flowActor,
+		Flow:    flow,
+	})
+
+	return fut
 }

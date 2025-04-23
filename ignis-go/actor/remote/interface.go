@@ -2,9 +2,11 @@ package remote
 
 import (
 	"context"
+
+	pb "google.golang.org/protobuf/proto"
+
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/proto/executor"
-	pb "google.golang.org/protobuf/proto"
 )
 
 type Protocol int

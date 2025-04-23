@@ -3,6 +3,7 @@ package dag
 import (
 	"github.com/asynkron/protoactor-go/actor"
 
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -12,8 +13,8 @@ type EntryNodeRuntime struct {
 }
 
 func (rt *EntryNodeRuntime) onInvoke(ctx actor.Context) {
-	ctx.Logger().Info("receive invoke",
-		"entry", rt.node.id,
+	ctx.Logger().Info("entry: receive invoke",
+		"id", rt.node.id,
 		"session", rt.sessionId,
 	)
 	for _, edge := range rt.successors {
@@ -26,7 +27,7 @@ func (rt *EntryNodeRuntime) onInvoke(ctx actor.Context) {
 
 func (rt *EntryNodeRuntime) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *proto.Successor:
+	case *messages.Successor:
 		rt.onAddEdge(ctx, msg)
 	case *proto.InvokeEmpty, *proto.Invoke:
 		rt.onInvoke(ctx)
@@ -85,7 +86,7 @@ func (rt *ExitNodeRuntime) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 
 func (rt *ExitNodeRuntime) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *proto.Successor:
+	case *messages.Successor:
 		rt.onAddEdge(ctx, msg)
 	case *proto.Invoke:
 		rt.onInvoke(ctx, msg)

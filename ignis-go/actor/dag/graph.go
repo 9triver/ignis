@@ -3,9 +3,11 @@ package dag
 import (
 	"fmt"
 
+	"github.com/asynkron/protoactor-go/actor"
+
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
-	"github.com/asynkron/protoactor-go/actor"
 )
 
 type graphEdge struct {
@@ -95,7 +97,7 @@ func (g *Graph) props(root bool, sessionId string, store *actor.PID) *actor.Prop
 		for edge := range g.edges {
 			from := rt.actors[edge.from]
 			to := rt.actors[edge.to]
-			ctx.Send(from, &proto.Successor{ID: edge.to, Param: edge.param, PID: to})
+			ctx.Send(from, &messages.Successor{ID: edge.to, Param: edge.param, PID: to})
 		}
 	}))
 }
@@ -165,8 +167,8 @@ func (rt *GraphRuntime) onInvoke(ctx actor.Context, _ *proto.Invoke) {
 }
 
 func (rt *GraphRuntime) onInvokeEmpty(ctx actor.Context) {
-	ctx.Logger().Info("receive invoke",
-		"graph", rt.node.id,
+	ctx.Logger().Info("graph: receive invoke",
+		"id", rt.node.id,
 		"session", rt.sessionId,
 	)
 	for entry := range rt.node.entries {
@@ -181,7 +183,7 @@ func (rt *GraphRuntime) onInvokeEmpty(ctx actor.Context) {
 func (rt *GraphRuntime) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
-	case *proto.Successor:
+	case *messages.Successor:
 		rt.onAddEdge(ctx, msg)
 	case *proto.Invoke:
 		rt.onInvoke(ctx, msg)

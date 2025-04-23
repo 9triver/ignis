@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/9triver/ignis/messages"
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/functions"
@@ -34,13 +35,13 @@ type LocalTaskHandler struct {
 	params    utils.Map[string, *proto.Flow]
 }
 
-func (h *LocalTaskHandler) InvokeAll(ctx actor.Context, successors []*proto.Successor) error {
-	futures := make(map[string]utils.Future[proto.Object])
+func (h *LocalTaskHandler) InvokeAll(ctx actor.Context, successors []*messages.Successor) error {
+	futures := make(map[string]utils.Future[messages.Object])
 	for param, flow := range h.params {
-		futures[param] = flow.Get(ctx)
+		futures[param] = store.GetObject(ctx, h.store, flow)
 	}
 
-	invoke := make(map[string]proto.Object)
+	invoke := make(map[string]messages.Object)
 	for param, fut := range futures {
 		obj, err := fut.Result()
 		if err != nil {
@@ -49,7 +50,7 @@ func (h *LocalTaskHandler) InvokeAll(ctx actor.Context, successors []*proto.Succ
 		invoke[param] = obj
 	}
 
-	obj, err := h.localFunc.Call(ctx, h.sessionId, invoke)
+	obj, err := h.localFunc.Call(invoke)
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func (h *LocalTaskHandler) InvokeAll(ctx actor.Context, successors []*proto.Succ
 
 func (h *LocalTaskHandler) InvokeOne(
 	_ actor.Context,
-	_ []*proto.Successor,
+	_ []*messages.Successor,
 	param string,
 	obj *proto.Flow,
 ) (done bool, err error) {
@@ -86,7 +87,7 @@ func (h *LocalTaskHandler) InvokeOne(
 	return h.ready(), nil
 }
 
-func (h *LocalTaskHandler) InvokeEmpty(ctx actor.Context, successors []*proto.Successor) (ready bool, err error) {
+func (h *LocalTaskHandler) InvokeEmpty(ctx actor.Context, successors []*messages.Successor) (ready bool, err error) {
 	return h.ready(), nil
 }
 

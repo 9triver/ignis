@@ -3,6 +3,7 @@ package functions
 import (
 	"testing"
 
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -33,10 +34,10 @@ func TestStreamJoinFunc(t *testing.T) {
 	}()
 
 	f := NewGo("sum", innerFunc, proto.LangGo)
-	s := proto.NewLocalStream(inputs, proto.LangGo)
-	invoke := map[string]proto.Object{}
+	s := messages.NewLocalStream(inputs, proto.LangGo)
+	invoke := map[string]messages.Object{}
 	invoke["Ints"] = s
-	r, err := f.Call(nil, "session0", invoke)
+	r, err := f.Call(invoke)
 	if err != nil {
 		t.Fatal(errors.Stacktrace(err))
 	}
@@ -78,17 +79,17 @@ func TestStreamStreamFunc(t *testing.T) {
 	}
 
 	f1 := NewGo("genInts", generateInts, proto.LangGo)
-	invoke := map[string]proto.Object{}
-	invoke["Num"] = proto.NewLocalObject(10, proto.LangGo)
-	r1, err := f1.Call(nil, "session0", invoke)
+	invoke := map[string]messages.Object{}
+	invoke["Num"] = messages.NewLocalObject(10, proto.LangGo)
+	r1, err := f1.Call(invoke)
 	if err != nil {
 		t.Fatal(errors.Stacktrace(err))
 	}
 
 	f2 := NewGo("getSum", getSum, proto.LangGo)
-	invoke2 := map[string]proto.Object{}
+	invoke2 := map[string]messages.Object{}
 	invoke2["Ints"] = r1
-	r2, err := f2.Call(nil, "session0", invoke2)
+	r2, err := f2.Call(invoke2)
 	if err != nil {
 		t.Fatal(errors.Stacktrace(err))
 	}

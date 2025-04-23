@@ -97,9 +97,6 @@ func NewMessage(conn string, cmd pb.Message) *Message {
 	case *proto.StreamChunk:
 		ret.Type = CommandType_STREAM_CHUNK
 		ret.Command = &Message_StreamChunk{StreamChunk: cmd}
-	case *proto.StreamEnd:
-		ret.Type = CommandType_STREAM_END
-		ret.Command = &Message_StreamEnd{StreamEnd: cmd}
 	default:
 		ret.Type = CommandType_UNSPECIFIED
 	}

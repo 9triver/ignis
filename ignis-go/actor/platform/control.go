@@ -12,6 +12,7 @@ import (
 	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/utils"
@@ -28,7 +29,7 @@ type Controller struct {
 }
 
 func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
-	ctx.Logger().Info("task: append actor",
+	ctx.Logger().Info("control: append actor",
 		"name", a.Name,
 		"params", a.Params,
 	)
@@ -41,7 +42,7 @@ func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor)
 }
 
 func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFunc) {
-	ctx.Logger().Info("task: append python function",
+	ctx.Logger().Info("control: append python function",
 		"name", f.Name,
 		"params", f.Params,
 	)
@@ -57,7 +58,7 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 
 func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData) {
 	obj := data.Object
-	ctx.Logger().Info("task: append data node",
+	ctx.Logger().Info("control: append data node",
 		"id", obj.ID,
 		"session", data.SessionID,
 	)
@@ -71,11 +72,11 @@ func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData
 }
 
 func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
-	ctx.Logger().Info("task: append arg",
+	ctx.Logger().Info("control: append arg",
 		"name", arg.Name,
+		"param", arg.Param,
 		"session", arg.SessionID,
 		"instance", arg.InstanceID,
-		"param", arg.Param,
 	)
 	sessionId := fmt.Sprintf("%s.%s", arg.SessionID, arg.InstanceID)
 	name := fmt.Sprintf("%s::%s", arg.Name, sessionId)
@@ -90,9 +91,9 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 		pid = ctx.Spawn(props)
 
 		if remotePID, ok := c.remotes[arg.Name]; ok {
-			ctx.Send(remotePID, &proto.CreateSession{
+			ctx.Send(remotePID, &messages.CreateSession{
 				SessionID: sessionId,
-				Successors: []*proto.Successor{
+				Successors: []*messages.Successor{
 					{
 						ID:    "store",
 						PID:   ctx.Self(),
@@ -128,7 +129,7 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 }
 
 func (c *Controller) onUnknown(ctx actor.Context, msg *controller.Message) {
-	ctx.Logger().Info("task: unknown message", "msg", msg)
+	ctx.Logger().Info("control: unknown message", "msg", msg)
 }
 
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
@@ -149,10 +150,10 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 func (c *Controller) onReturn(ctx actor.Context, ret *proto.Invoke) {
 	splits := strings.SplitN(ret.SessionID, ".", 2)
 	sessionId, instanceId := splits[0], splits[1]
-	ctx.Logger().Info("task: execution done",
+	ctx.Logger().Info("control: execution done",
+		"name", ret.Param,
 		"session", sessionId,
 		"instance", instanceId,
-		"name", ret.Param,
 	)
 
 	var msg *controller.Message

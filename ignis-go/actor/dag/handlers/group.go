@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils/errors"
 	"github.com/asynkron/protoactor-go/actor"
@@ -17,19 +18,19 @@ type GroupedTaskHandler struct {
 	selected   *actor.PID
 }
 
-func (h *GroupedTaskHandler) InvokeAll(ctx actor.Context, successors []*proto.Successor) error {
+func (h *GroupedTaskHandler) InvokeAll(ctx actor.Context, successors []*messages.Successor) error {
 	if h.selected == nil {
 		return errors.New("candidate not selected")
 	}
 
-	ctx.Send(h.selected, &proto.CreateSession{
+	ctx.Send(h.selected, &messages.CreateSession{
 		SessionID:  h.sessionId,
 		Successors: successors,
 	})
 	return nil
 }
 
-func (h *GroupedTaskHandler) InvokeOne(ctx actor.Context, _ []*proto.Successor, param string, obj *proto.Flow) (ready bool, err error) {
+func (h *GroupedTaskHandler) InvokeOne(ctx actor.Context, _ []*messages.Successor, param string, obj *proto.Flow) (ready bool, err error) {
 	if h.selected == nil {
 		h.selected = h.strategy.Select(h.candidates)
 	}
@@ -43,7 +44,7 @@ func (h *GroupedTaskHandler) InvokeOne(ctx actor.Context, _ []*proto.Successor, 
 	return h.ready(), nil
 }
 
-func (h *GroupedTaskHandler) InvokeEmpty(ctx actor.Context, successors []*proto.Successor) (ready bool, err error) {
+func (h *GroupedTaskHandler) InvokeEmpty(ctx actor.Context, successors []*messages.Successor) (ready bool, err error) {
 	if h.selected == nil {
 		h.selected = h.strategy.Select(h.candidates)
 	}

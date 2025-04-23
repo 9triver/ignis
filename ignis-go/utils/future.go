@@ -66,6 +66,10 @@ func (f *ctxFutureImpl[T]) Reject(err error) {
 }
 
 func (f *ctxFutureImpl[T]) OnDone(callback FutureDoneCallback[T]) {
+	if f.done {
+		callback(f.value, f.err)
+		return
+	}
 	f.onDones = append(f.onDones, callback)
 }
 

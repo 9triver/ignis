@@ -3,6 +3,8 @@ import inspect
 import json
 import queue
 import sys
+import uuid
+
 from typing import Any, TypedDict, Iterable
 
 import cloudpickle
@@ -36,7 +38,7 @@ class Streams:
                 if obj is None:
                     print(f"break {name}", file=sys.stderr)
                     break
-                
+
                 yield obj
 
         return generator(q)
@@ -53,6 +55,10 @@ class Streams:
 
 
 class EncDec:
+    @staticmethod
+    def next_id() -> str:
+        return "obj." + str(uuid.uuid4())
+
     @staticmethod
     def decode(obj: platform.EncodedObject):
         if obj.Stream:  # receives stream
@@ -78,13 +84,15 @@ class EncDec:
             case _:
                 raise ValueError(f"unsupported language {lang}")
 
-    @staticmethod
+    @classmethod
     def encode(
-            obj: Any, language: platform.Language = LANG_JSON
+        cls, obj: Any, language: platform.Language = LANG_JSON
     ) -> platform.EncodedObject:
         if inspect.isgenerator(obj):
             print(f"get generator {obj}", file=sys.stderr)
-            return platform.EncodedObject(Stream=True, Language=language)
+            return platform.EncodedObject(
+                ID=cls.next_id(), Stream=True, Language=language
+            )
 
         match language:
             case platform.LANG_PYTHON:
@@ -93,4 +101,4 @@ class EncDec:
                 data = json.dumps(obj).encode()
             case _:
                 raise ValueError(f"unsupported language {language}")
-        return platform.EncodedObject(Data=data, Language=language)
+        return platform.EncodedObject(ID=cls.next_id(), Data=data, Language=language)

@@ -1,9 +1,9 @@
 package functions
 
 import (
-	"github.com/asynkron/protoactor-go/actor"
 	"reflect"
 
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -13,7 +13,7 @@ import (
 type Function interface {
 	Name() string
 	Params() utils.Set[string]
-	Call(ctx actor.Context, sessionId string, params map[string]proto.Object) (proto.Object, error)
+	Call(params map[string]messages.Object) (messages.Object, error)
 	Language() proto.Language
 }
 

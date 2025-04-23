@@ -12,17 +12,28 @@ enum Language {
   LANG_PYTHON = 3; // Values that are only compatible with Python actors.
 }
 
+message StoreRef {
+  string ID = 1;
+  actor.PID PID = 2;
+}
+
+message ActorRef {
+  StoreRef Store = 1;
+  string ID = 2;
+  actor.PID PID = 3;
+}
+
 // Flow is reference to real object or stream
 message Flow {
   string ObjectID = 1; // ID of referenced object or stream
-  actor.PID Source = 2; // points to store actor of a single worker.
+  StoreRef Source = 2; // points to store actor of a single worker.
 }
 
 // EncodedObject stores a byte encoded object
 message EncodedObject {
   string ID = 1; // if returned from ipc call, id won't be set
   bytes Data = 2; // serialized object data, or nil if current object is a stream
-  actor.PID Source = 3; // points to store actor of the stream.
+  StoreRef Source = 3; // points to store actor of the stream.
   Language Language = 4; // if is JSON, it can be decoded to either Go, Python, or else it can only be decoded to corresponding language.
   bool Stream = 5; // mark if the object is a stream
 }
@@ -32,31 +43,32 @@ message EncodedObject {
 // but no real stream chunk is transmitted.
 message ObjectRequest {
   string ID = 1;
-  actor.PID ReplyTo = 2;
+  StoreRef ReplyTo = 2;
+}
+
+message ObjectResponse {
+  string ID = 1;
+  EncodedObject Value = 2;
+  string Error = 3;
 }
 
 // StreamRequest requests stream with ID, and the stream **content** is sent to ReplyTo by StreamChunks,
 // ending with StreamEnd message.
-message StreamRequest {
-  string StreamID = 1;
-  actor.PID ReplyTo = 2;
-}
+//message StreamRequest {
+//  string StreamID = 1;
+//  StoreRef ReplyTo = 2;
+//}
 
 message StreamChunk {
   string StreamID = 1;
-  oneof Chunk {
-    EncodedObject Value = 2;
-    string Error = 3;
-  }
-}
-
-message StreamEnd {
-  string StreamID = 1; // ID of requested stream
+  bool EoS = 2;
+  EncodedObject Value = 3;
+  string Error = 4;
 }
 
 // Generic Error message for platform
 message Error {
-  actor.PID Sender = 1;
+  ActorRef Sender = 1;
   string Message = 2;
 }
 

@@ -2,12 +2,14 @@ package rpc
 
 import (
 	"context"
+	"io"
+
+	"google.golang.org/grpc"
+
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils"
-	"google.golang.org/grpc"
-	"io"
 )
 
 type controllerService struct {
