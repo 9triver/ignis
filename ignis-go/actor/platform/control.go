@@ -89,6 +89,12 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 
 		props := node.Props(sessionId, c.storePID)
 		pid = ctx.Spawn(props)
+		ctx.Send(pid, &messages.Successor{
+			ID:    "store",
+			PID:   ctx.Self(),
+			Param: arg.Name,
+		})
+		c.runtimes[name] = pid
 
 		if remotePID, ok := c.remotes[arg.Name]; ok {
 			ctx.Send(remotePID, &messages.CreateSession{
