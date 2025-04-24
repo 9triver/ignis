@@ -82,6 +82,8 @@ func (m *VenvManager) createEnv(name string) (*VirtualEnv, error) {
 	return &VirtualEnv{
 		ctx:      m.ctx,
 		handler:  m.em.NewExecutor(m.ctx, name),
+		futures:  make(map[string]utils.Future[messages.Object]),
+		streams:  make(map[string]*messages.LocalStream),
 		Name:     name,
 		Exec:     path.Join(venvPath, "bin", "python"),
 		Packages: []string{"pyzmq"},
