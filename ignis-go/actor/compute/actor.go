@@ -4,6 +4,8 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/functions"
+	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -23,7 +25,7 @@ func (a *Actor) Deps() utils.Set[string] {
 	return a.executor.Deps()
 }
 
-func (a *Actor) newSession(ctx actor.Context, sessionId string, successors []*proto.Successor) *actor.PID {
+func (a *Actor) newSession(ctx actor.Context, sessionId string, successors []*messages.Successor) *actor.PID {
 	ctx.Logger().Info("compute: create session", "actor", a.name, "session", sessionId)
 	props := NewSession(sessionId, a.store, a.executor, a.Deps(), successors)
 	session, _ := ctx.SpawnNamed(props, sessionId)
@@ -31,7 +33,7 @@ func (a *Actor) newSession(ctx actor.Context, sessionId string, successors []*pr
 	return session
 }
 
-func (a *Actor) onCreateSession(ctx actor.Context, create *proto.CreateSession) {
+func (a *Actor) onCreateSession(ctx actor.Context, create *messages.CreateSession) {
 	if _, ok := a.sessions[create.SessionID]; ok {
 		ctx.Logger().Warn("compute: session exists, ignoring", "actor", a.name, "session", create.SessionID)
 		return
@@ -40,14 +42,19 @@ func (a *Actor) onCreateSession(ctx actor.Context, create *proto.CreateSession) 
 }
 
 func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
+	ctx.Logger().Info("compute: receive invoke",
+		"actor", a.name,
+		"session", invoke.SessionID,
+		"param", invoke.Param,
+		"value", invoke.Value.ObjectID,
+	)
 	session, ok := a.sessions.Get(invoke.SessionID)
 	if !ok {
 		ctx.Logger().Error("compute: session not found", "actor", a.name, "session", invoke.SessionID)
 		return
 	}
 
-	flow := invoke.Value
-	flow.Get(ctx).OnDone(func(obj proto.Object, err error) {
+	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj messages.Object, err error) {
 		if err != nil {
 			ctx.Logger().Error("fetch failed",
 				"a", a.name,
@@ -63,7 +70,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 
 func (a *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *proto.CreateSession:
+	case *messages.CreateSession:
 		a.onCreateSession(ctx, msg)
 	case *proto.Invoke:
 		a.onInvoke(ctx, msg)

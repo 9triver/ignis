@@ -1,10 +1,11 @@
 package proto
 
 import (
-	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/utils"
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
+
 	"github.com/9triver/ignis/utils/errors"
-	"github.com/asynkron/protoactor-go/actor"
 )
 
 const (
@@ -14,56 +15,58 @@ const (
 	LangPython  = Language_LANG_PYTHON
 )
 
-type Successor struct {
-	ID    string
-	Param string
-	PID   *actor.PID
-}
-
-type CreateSession struct {
-	SessionID  string
-	Successors []*Successor
-}
-
 func NewStreamChunk(streamId string, value *EncodedObject, err error) *StreamChunk {
-	cmd := &StreamChunk{StreamID: streamId}
+	chunk := &StreamChunk{StreamID: streamId, EoS: false}
 	if err != nil {
-		cmd.Chunk = &StreamChunk_Error{Error: err.Error()}
+		chunk.Error = err.Error()
 	} else {
-		cmd.Chunk = &StreamChunk_Value{Value: value}
+		chunk.Value = value
 	}
-	return cmd
+	return chunk
 }
 
-func NewStreamEnd(streamId string) *StreamEnd {
-	return &StreamEnd{StreamID: streamId}
+func NewStreamEnd(streamId string) *StreamChunk {
+	return &StreamChunk{StreamID: streamId, EoS: true}
 }
 
-func (flow *Flow) Get(ctx actor.Context) utils.Future[Object] {
-	fut := utils.NewFuture[Object](configs.FlowTimeout)
-	if flow == nil {
-		fut.Reject(errors.New("flow is nil"))
-		return fut
-	}
+/** Definition for EncodedObject (generated):
+type EncodedObject struct {
+	ID       string     // if returned from ipc call, id won't be set
+	Data     []byte     // serialized object data, or nil if current object is a stream
+	Source   *actor.PID // points to store actor of the object.
+	Language Language   // if is JSON, it can be decoded to either Go, Python, or else it can only be decoded to corresponding language.
+}
+*/
 
-	props := actor.PropsFromFunc(func(c actor.Context) {
-		switch msg := c.Message().(type) {
-		case *Error:
-			fut.Reject(errors.Format("flow %s failed: %s", flow.ObjectID, msg.Message))
-		case Object:
-			if msg.GetID() != flow.ObjectID {
-				fut.Reject(errors.Format("flow %s failed: unexpected ID %s", flow.ObjectID, msg.GetID()))
-				return
-			}
-			fut.Resolve(msg)
+func (obj *EncodedObject) GetEncoded() (*EncodedObject, error) {
+	return obj, nil
+}
+
+func (obj *EncodedObject) asObject() (any, error) {
+	switch obj.Language {
+	case Language_LANG_JSON:
+		var v any
+		if err := json.Unmarshal(obj.Data, &v); err != nil {
+			return nil, err
 		}
-	})
+		return v, nil
+	case Language_LANG_PYTHON:
+		return nil, errors.New("decoding python obj is not supported in Go runtime")
+	case Language_LANG_GO:
+		var v any
+		dec := gob.NewDecoder(bytes.NewReader(obj.Data))
+		if err := dec.Decode(&v); err != nil {
+			return nil, err
+		}
+		return v, nil
+	default:
+		return nil, errors.New("unknown language")
+	}
+}
 
-	flowActor := ctx.Spawn(props)
-	ctx.Send(flow.Source, &ObjectRequest{
-		ID:      flow.ObjectID,
-		ReplyTo: flowActor,
-	})
-
-	return fut
+func (obj *EncodedObject) GetValue() (any, error) {
+	if obj.Stream {
+		return nil, errors.New("cannot get object directly on stream")
+	}
+	return obj.asObject()
 }

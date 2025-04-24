@@ -6,6 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -15,13 +16,13 @@ type Session struct {
 	store      *actor.PID
 	executor   *Executor
 	deps       utils.Set[string]
-	params     map[string]proto.Object
-	successors []*proto.Successor
+	params     map[string]messages.Object
+	successors []*messages.Successor
 }
 
 type SessionInvoke struct {
 	Param string
-	Value proto.Object
+	Value messages.Object
 }
 
 func (s *Session) ID() string {
@@ -34,7 +35,7 @@ func (s *Session) doInvoke(ctx actor.Context) {
 		Context:   ctx,
 		SessionID: s.id,
 		Params:    s.params,
-		OnDone: func(obj proto.Object, err error, duration time.Duration) {
+		OnDone: func(obj messages.Object, err error, duration time.Duration) {
 			if err != nil {
 				s.sendError(ctx, err)
 				return
@@ -53,18 +54,14 @@ func (s *Session) doInvoke(ctx actor.Context) {
 }
 
 func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
-	if invoke.Value == nil {
-		return
-	}
-
-	ctx.Logger().Info("session invokes", "session", s.id, "param", invoke.Param)
+	ctx.Logger().Info("session: receive invoke", "session", s.id, "param", invoke.Param)
 	s.enqueue(invoke.Param, invoke.Value)
 	if s.ready() {
 		s.doInvoke(ctx)
 	}
 }
 
-func (s *Session) enqueue(param string, obj proto.Object) {
+func (s *Session) enqueue(param string, obj messages.Object) {
 	if !s.deps.Contains(param) {
 		return
 	}
@@ -112,7 +109,7 @@ func NewSession(
 	store *actor.PID,
 	executor *Executor,
 	deps utils.Set[string],
-	successors []*proto.Successor,
+	successors []*messages.Successor,
 ) *actor.Props {
 	return actor.PropsFromProducer(func() actor.Actor {
 		return &Session{
@@ -120,7 +117,7 @@ func NewSession(
 			store:      store,
 			executor:   executor,
 			deps:       deps.Copy(),
-			params:     make(map[string]proto.Object),
+			params:     make(map[string]messages.Object),
 			successors: successors,
 		}
 	})

@@ -1,20 +1,21 @@
 package compute
 
 import (
-	"github.com/asynkron/protoactor-go/actor"
 	"time"
+
+	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/utils"
 )
 
 type ExecInput struct {
 	Context   actor.Context
 	SessionID string
-	Params    map[string]proto.Object
-	OnDone    func(obj proto.Object, err error, duration time.Duration)
+	Params    map[string]messages.Object
+	OnDone    func(obj messages.Object, err error, duration time.Duration)
 }
 
 type Executor struct {
@@ -29,7 +30,7 @@ func (e *Executor) Deps() utils.Set[string] {
 func (e *Executor) doStart() {
 	for req := range e.requests {
 		tic := time.Now()
-		obj, err := e.handler.Call(req.Context, req.SessionID, req.Params)
+		obj, err := e.handler.Call(req.Params)
 		req.OnDone(obj, err, time.Since(tic))
 	}
 }

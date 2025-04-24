@@ -3,10 +3,10 @@ package functions
 import (
 	"reflect"
 
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
-	"github.com/asynkron/protoactor-go/actor"
 )
 
 type GoFunction[I, O any] struct {
@@ -17,12 +17,12 @@ type GoFunction[I, O any] struct {
 
 var _ Function = (*GoFunction[any, any])(nil)
 
-func (h *GoFunction[I, O]) Call(ctx actor.Context, sessionId string, params map[string]proto.Object) (proto.Object, error) {
+func (h *GoFunction[I, O]) Call(params map[string]messages.Object) (messages.Object, error) {
 	invoke := make(map[string]any)
 	for k, v := range params {
 		var value any
-		if s, ok := v.ToStream(); ok {
-			value = s.ToChan(ctx)
+		if s, ok := v.(*messages.LocalStream); ok {
+			value = s.ToChan()
 		} else {
 			vv, err := v.GetValue()
 			if err != nil {
@@ -44,11 +44,11 @@ func (h *GoFunction[I, O]) Call(ctx actor.Context, sessionId string, params map[
 	}
 
 	t := reflect.TypeFor[O]()
-	var obj proto.Object
+	var obj messages.Object
 	if t.Kind() == reflect.Chan {
-		obj = proto.NewLocalStream(o, h.language)
+		obj = messages.NewLocalStream(o, h.language)
 	} else {
-		obj = proto.NewLocalObject(o, h.language)
+		obj = messages.NewLocalObject(o, h.language)
 	}
 	return obj, nil
 }

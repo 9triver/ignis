@@ -18,30 +18,31 @@ class RemoteFunction(NamedTuple):
     fn: Callable[..., Any]
 
     def call(self, *args, **kwargs):
-        return self.fn(*args, **kwargs)
+        return self.fn(kwargs)
 
 
-class _Add:
+class _DebugFuncs:
     @staticmethod
-    def run(a: int, b: int) -> int:
+    def add(a: int, b: int) -> int:
         return a + b
 
-
-class _Sum:
     @staticmethod
-    def run(ints: Iterable[int]) -> int:
+    def sum(ints: Iterable[int]) -> int:
         print(ints, file=sys.stderr)
         s = 0
         for i in ints:
             s += i
         return s
 
-
-class _Generate:
     @staticmethod
-    def run(n: int) -> Iterable[int]:
+    def gen(n: int) -> Iterable[int]:
         for i in range(n):
             yield i
+
+    @staticmethod
+    def map(ints: Iterable[int]) -> Iterable[int]:
+        for i in ints:
+            yield i * 2
 
 
 class Executor:
@@ -49,17 +50,18 @@ class Executor:
         self.name = name
         self.registries: dict[str, RemoteFunction] = {
             # for debugging purpose
-            "__add": RemoteFunction(platform.LANG_JSON, _Add.run),
-            "__sum": RemoteFunction(platform.LANG_JSON, _Sum.run),
-            "__generate": RemoteFunction(platform.LANG_JSON, _Generate.run),
+            "__add": RemoteFunction(platform.LANG_JSON, _DebugFuncs.add),
+            "__sum": RemoteFunction(platform.LANG_JSON, _DebugFuncs.sum),
+            "__gen": RemoteFunction(platform.LANG_JSON, _DebugFuncs.gen),
+            "__map": RemoteFunction(platform.LANG_JSON, _DebugFuncs.map),
         }
         self.send_q = queue.Queue[executor.Message | None]()
 
     def on_add_handler(self, cmd: executor.AddHandler):
         obj = serde.loads(cmd.Handler)
-        if not callable(obj.run):
+        if not callable(obj):
             return
-        self.registries[cmd.Name] = RemoteFunction(cmd.Language, obj.run)
+        self.registries[cmd.Name] = RemoteFunction(cmd.Language, obj)
 
     def on_remove_handler(self, cmd: executor.RemoveHandler):
         if cmd.Name in self.registries:
@@ -81,6 +83,7 @@ class Executor:
             self.send_q.put(msg)
 
         try:
+            print(cmd.Args, file=sys.stderr)
             args = {k: EncDec.decode(v) for k, v in cmd.Args.items()}
             func = self.registries[cmd.Name]
             value = func.call(**args)
@@ -92,9 +95,9 @@ class Executor:
             if inspect.isgenerator(value):
                 for obj in value:
                     send_chunk(obj)
-                eos = platform.StreamEnd(StreamID=cmd.CorrID)
+                eos = platform.StreamChunk(StreamID=cmd.CorrID, EoS=True)
                 msg = executor.Message(
-                    Conn=self.name, Type=executor.STREAM_END, StreamEnd=eos
+                    Conn=self.name, Type=executor.STREAM_CHUNK, StreamChunk=eos
                 )
                 self.send_q.put(msg)
         except Exception as e:
@@ -105,12 +108,12 @@ class Executor:
 
     @staticmethod
     def on_stream_chunk(cmd: platform.StreamChunk):
+        if cmd.EoS:
+            Streams.close(cmd.StreamID)
+            return
+
         obj = EncDec.decode(cmd.Value)
         Streams.put(cmd.StreamID, obj)
-
-    @staticmethod
-    def on_stream_end(cmd: platform.StreamEnd):
-        Streams.close(cmd.StreamID)
 
     def loop(self, socket: zmq.SyncSocket):
         while True:
@@ -135,9 +138,6 @@ class Executor:
                 case executor.STREAM_CHUNK:
                     print("receive chunk", file=sys.stderr)
                     self.on_stream_chunk(cmd.StreamChunk)
-                case executor.STREAM_END:
-                    print("receive stream end", file=sys.stderr)
-                    self.on_stream_end(cmd.StreamEnd)
                 case _:
                     print("unknown command type, ignoring", file=sys.stderr)
 

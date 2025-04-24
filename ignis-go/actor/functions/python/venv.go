@@ -2,7 +2,6 @@ package python
 
 import (
 	"context"
-	"github.com/asynkron/protoactor-go/actor"
 	"os"
 	"os/exec"
 	"path"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/configs"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils"
@@ -22,8 +22,8 @@ type VirtualEnv struct {
 	ctx     context.Context
 	handler remote.Executor
 	started bool
-	futures map[string]utils.Future[proto.Object]
-	streams map[string]*proto.LocalStream
+	futures map[string]utils.Future[messages.Object]
+	streams map[string]*messages.LocalStream
 
 	Name     string   `json:"name"`
 	Exec     string   `json:"exec"`
@@ -68,8 +68,8 @@ func (v *VirtualEnv) AddPackages(p ...string) error {
 	return nil
 }
 
-func (v *VirtualEnv) Execute(ctx actor.Context, name, method string, args map[string]proto.Object) utils.Future[proto.Object] {
-	fut := utils.NewFuture[proto.Object](configs.ExecutionTimeout)
+func (v *VirtualEnv) Execute(name, method string, args map[string]messages.Object) utils.Future[messages.Object] {
+	fut := utils.NewFuture[messages.Object](configs.ExecutionTimeout)
 	encoded := make(map[string]*proto.EncodedObject)
 	for param, obj := range args {
 		enc, err := obj.GetEncoded()
@@ -87,8 +87,8 @@ func (v *VirtualEnv) Execute(ctx actor.Context, name, method string, args map[st
 	v.handler.SendChan() <- msg
 
 	for _, arg := range args {
-		if stream, ok := arg.ToStream(); ok {
-			chunks := stream.ToChan(ctx)
+		if stream, ok := arg.(*messages.LocalStream); ok {
+			chunks := stream.ToChan()
 			go func() {
 				defer func() {
 					v.handler.SendChan() <- executor.NewStreamEnd(v.Name, stream.GetID())
@@ -120,10 +120,10 @@ func (v *VirtualEnv) onReturn(ret *executor.Return) {
 		return
 	}
 
-	var o proto.Object
+	var o messages.Object
 	if obj.Stream { // return a stream from python
-		values := make(chan proto.Object)
-		ls := proto.NewLocalStream(values, obj.GetLanguage())
+		values := make(chan messages.Object)
+		ls := messages.NewLocalStream(values, obj.GetLanguage())
 		v.streams[ret.CorrID] = ls
 		o = ls
 	} else {
@@ -138,28 +138,17 @@ func (v *VirtualEnv) onStreamChunk(chunk *proto.StreamChunk) {
 		return
 	}
 
-	if chunk.GetError() != "" {
+	if chunk.EoS {
 		stream.EnqueueChunk(nil)
 	} else {
 		stream.EnqueueChunk(chunk.GetValue())
 	}
 }
 
-func (v *VirtualEnv) onStreamEnd(end *proto.StreamEnd) {
-	stream, ok := v.streams[end.StreamID]
-	if !ok {
-		return
-	}
-
-	stream.EnqueueChunk(nil)
-}
-
 func (v *VirtualEnv) onReceive(msg *executor.Message) {
 	switch cmd := msg.Command.(type) {
 	case *executor.Message_StreamChunk:
 		v.onStreamChunk(cmd.StreamChunk)
-	case *executor.Message_StreamEnd:
-		v.onStreamEnd(cmd.StreamEnd)
 	case *executor.Message_Return:
 		v.onReturn(cmd.Return)
 	}

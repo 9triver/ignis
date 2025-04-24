@@ -2,12 +2,13 @@ package rpc
 
 import (
 	"context"
-	"github.com/9triver/ignis/proto/executor"
-	"google.golang.org/grpc"
 	"net"
+
+	"google.golang.org/grpc"
 
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/proto/controller"
+	"github.com/9triver/ignis/proto/executor"
 )
 
 type ConnectionManager struct {

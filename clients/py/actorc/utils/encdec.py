@@ -3,6 +3,8 @@ import inspect
 import json
 import queue
 import sys
+import uuid
+
 from typing import Any, TypedDict, Iterable
 
 import cloudpickle
@@ -36,36 +38,45 @@ class Streams:
                 if obj is None:
                     print(f"break {name}", file=sys.stderr)
                     break
-                
+
                 yield obj
 
         return generator(q)
 
     @classmethod
     def put(cls, name: str, obj: Any):
+        if name not in cls.streams:
+            return
         print(f"put {obj} to {name}", file=sys.stderr)
         cls.streams[name].put(obj)
 
     @classmethod
     def close(cls, name: str):
+        if name not in cls.streams:
+            return
         print(f"close {name}", file=sys.stderr)
         cls.streams[name].put(None)
 
 
 class EncDec:
     @staticmethod
+    def next_id() -> str:
+        return "obj." + str(uuid.uuid4())
+
+    @staticmethod
     def decode(obj: platform.EncodedObject):
         if obj.Stream:  # receives stream
             return Streams.register(obj.ID)
 
         data = obj.Data
+        print(obj.Language, file=sys.stderr)
         match obj.Language:
             case platform.LANG_PYTHON:
                 return cloudpickle.loads(data)
             case platform.LANG_JSON:
                 return json.loads(data)
             case _:
-                raise ValueError(f"unsupported language {obj.Language}")
+                raise ValueError(f"dec: unsupported language {obj.Language}")
 
     @staticmethod
     def decode_dict(obj: EncodedObject):
@@ -76,15 +87,17 @@ class EncDec:
             case platform.LANG_JSON:
                 return json.loads(data)
             case _:
-                raise ValueError(f"unsupported language {lang}")
+                raise ValueError(f"dec: unsupported language {lang}")
 
-    @staticmethod
+    @classmethod
     def encode(
-            obj: Any, language: platform.Language = LANG_JSON
+        cls, obj: Any, language: platform.Language = LANG_JSON
     ) -> platform.EncodedObject:
         if inspect.isgenerator(obj):
             print(f"get generator {obj}", file=sys.stderr)
-            return platform.EncodedObject(Stream=True, Language=language)
+            return platform.EncodedObject(
+                ID=cls.next_id(), Stream=True, Language=language
+            )
 
         match language:
             case platform.LANG_PYTHON:
@@ -92,5 +105,5 @@ class EncDec:
             case platform.LANG_JSON:
                 data = json.dumps(obj).encode()
             case _:
-                raise ValueError(f"unsupported language {language}")
-        return platform.EncodedObject(Data=data, Language=language)
+                raise ValueError(f"enc: unsupported language {language}")
+        return platform.EncodedObject(ID=cls.next_id(), Data=data, Language=language)

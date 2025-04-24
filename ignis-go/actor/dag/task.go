@@ -5,15 +5,16 @@ import (
 
 	"github.com/9triver/ignis/actor/dag/handlers"
 	"github.com/9triver/ignis/actor/functions"
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
 
 type TaskHandler interface {
-	InvokeAll(ctx actor.Context, successors []*proto.Successor) error
-	InvokeOne(ctx actor.Context, successors []*proto.Successor, param string, obj *proto.Flow) (ready bool, err error)
-	InvokeEmpty(ctx actor.Context, successors []*proto.Successor) (ready bool, err error)
+	InvokeAll(ctx actor.Context, successors []*messages.Successor) error
+	InvokeOne(ctx actor.Context, successors []*messages.Successor, param string, obj *proto.Flow) (ready bool, err error)
+	InvokeEmpty(ctx actor.Context, successors []*messages.Successor) (ready bool, err error)
 }
 
 type TaskHandlerProducer func(sessionId string, store *actor.PID) TaskHandler
@@ -72,8 +73,8 @@ func (rt *TaskNodeRuntime) onTaskError(ctx actor.Context, err error) {
 }
 
 func (rt *TaskNodeRuntime) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
-	ctx.Logger().Info("receive invoke",
-		"node", rt.node.id,
+	ctx.Logger().Info("task: receive invoke",
+		"id", rt.node.id,
 		"param", invoke.Param,
 		"session", rt.sessionId,
 	)
@@ -93,8 +94,8 @@ func (rt *TaskNodeRuntime) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 }
 
 func (rt *TaskNodeRuntime) onInvokeEmpty(ctx actor.Context) {
-	ctx.Logger().Info("receive invoke empty",
-		"node", rt.node.id,
+	ctx.Logger().Info("task: receive invoke empty",
+		"id", rt.node.id,
 		"session", rt.sessionId,
 	)
 
@@ -114,7 +115,7 @@ func (rt *TaskNodeRuntime) onInvokeEmpty(ctx actor.Context) {
 func (rt *TaskNodeRuntime) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
-	case *proto.Successor:
+	case *messages.Successor:
 		rt.onAddEdge(ctx, msg)
 	case *proto.Invoke:
 		rt.onInvoke(ctx, msg)

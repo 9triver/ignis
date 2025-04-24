@@ -1,17 +1,21 @@
+import sys
+
 from lucas import workflow, function, Runtime, Workflow, Function
 from lucas.serverless_function import Metadata
 from lucas.workflow.executor import Executor
 from lucas.workflow.dag import DAGNode, DataNode, ControlNode
 from lucas.utils.logging import log
-from ..protos.controller import controller_pb2, controller_pb2_grpc
-from ..protos import platform_pb2
+
+from actorc.protos.controller import controller_pb2, controller_pb2_grpc
+from actorc.protos import platform_pb2
+
 import cloudpickle
 import grpc
 import uuid
 import queue
 import time
 
-channel = grpc.insecure_channel("localhost:50051")
+channel = grpc.insecure_channel("localhost:8082")
 stub = controller_pb2_grpc.ServiceStub(channel)
 q = queue.Queue()
 
@@ -19,6 +23,9 @@ q = queue.Queue()
 def generate():
     while True:
         msg = q.get()
+        if msg is None:
+            break
+        print(msg)
         yield msg
 
 
@@ -32,6 +39,7 @@ result_map: dict[str, platform_pb2.Flow] = {}
 def run():
     while True:
         for response in response_stream:
+            print("resp", response)
             response: controller_pb2.Message
             if response.Type == controller_pb2.CommandType.BK_RETURN_RESULT:
                 result: controller_pb2.ReturnResult = response.ReturnResult
@@ -40,7 +48,7 @@ def run():
                 name = result.Name
                 value = result.Value
                 key = f"{sessionID}-{instanceID}-{name}"
-                result_map[key] = value
+                result_map[key] = value.Ref
         time.sleep(1)
 
 
@@ -97,6 +105,7 @@ class ActorFunction(Function):
                 Venv=venv,
                 Requirements=dependcy,
                 PickledObject=cloudpickle.dumps(self._fn),
+                Language=platform_pb2.LANG_PYTHON,
             ),
         )
         q.put(message)
@@ -118,36 +127,6 @@ class ActorFunction(Function):
             return result
 
         return actor_function
-
-
-end = True
-
-
-@function(
-    wrapper=ActorFunction,
-    dependency=["torch", "numpy"],
-    provider="actor",
-    name="funca",
-    params=["a"],
-    venv="conda",
-)
-def funca(rt: Runtime):
-    global end
-    result = {**rt.input(), "end": end}
-    end = False
-    return rt.output(result)
-
-
-@function(
-    wrapper=ActorFunction,
-    dependency=["torch", "numpy"],
-    provider="actor",
-    name="funcb",
-    params=["a"],
-    venv="conda",
-)
-def funcb(rt: Runtime):
-    return rt.output(rt.input())
 
 
 class ActorExecutor(Executor):
@@ -178,29 +157,23 @@ class ActorExecutor(Executor):
                         control_node_metadata = control_node.metadata()
                         params = control_node_metadata["params"]
                         fn_type = control_node_metadata["functiontype"]
-
-                        data_type = controller_pb2.Data.ObjectType.OBJ_ENCODED
                         data = node._ld.value
-                        if isinstance(
-                            data, platform_pb2.Flow
-                        ):  # 判断一下是什么类型的值
-                            data_type = controller_pb2.Data.ObjectType.OBJ_REF
-                        if fn_type == "remote":  # 要调用的函数是远程函数时才需要
 
-                            if (
-                                data_type == controller_pb2.Data.ObjectType.OBJ_ENCODED
-                            ):  # 如果是实际值，就要序列化
-                                data = cloudpickle.dumps(data)
+                        if fn_type == "remote":  # 要调用的函数是远程函数时才需要
+                            if isinstance(data, platform_pb2.Flow):
                                 rpc_data = controller_pb2.Data(
-                                    Type=data_type,
+                                    Type=controller_pb2.Data.ObjectType.OBJ_REF,
+                                    Ref=data,
+                                )
+                            else:
+                                rpc_data = controller_pb2.Data(
+                                    Type=controller_pb2.Data.ObjectType.OBJ_ENCODED,
                                     Encoded=platform_pb2.EncodedObject(
-                                        ID="",
-                                        Data=data,
+                                        ID="obj." + str(uuid.uuid4()),
+                                        Data=cloudpickle.dumps(data),
                                         Language=platform_pb2.Language.LANG_PYTHON,
                                     ),
                                 )
-                            else:
-                                rpc_data = controller_pb2.Data(Type=data_type, Ref=data)
 
                             appendArg = controller_pb2.AppendArg(
                                 SessionID=self._sesstionID,
@@ -250,24 +223,82 @@ class ActorExecutor(Executor):
         return result
 
 
+@function(
+    wrapper=ActorFunction,
+    dependency=[],
+    provider="actor",
+    name="read_data",
+    params=["dataset", "name"],
+    venv="test2",
+)
+def read_data(rt: Runtime):
+    inputs = rt.input()
+    import os
+
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    from datasets import load_dataset
+
+    dataset = load_dataset(inputs["dataset"], inputs["name"])["train"]
+
+    def generator():
+        for i, x in enumerate(dataset):
+            print(x)
+            yield x
+            if i > 100:
+                return
+
+    return rt.output(generator())
+
+
+@function(
+    wrapper=ActorFunction,
+    dependency=[],
+    provider="actor",
+    name="process_data",
+    params=["loader"],
+    venv="test2",
+)
+def process_data(rt: Runtime):
+    inputs = rt.input()
+
+    def generator():
+        for x in inputs["loader"]:
+            if x["text"] == "":
+                continue
+            x["text"] = x["text"].strip()
+            yield x
+
+    return rt.output(generator())
+
+
+@function(
+    wrapper=ActorFunction,
+    dependency=[],
+    provider="actor",
+    name="train",
+    params=["loader"],
+    venv="test2",
+)
+def process_data(rt: Runtime):
+    inputs = rt.input()
+    param = 0
+    for x in inputs["loader"]:
+        print(x, file=sys.stderr)
+        param += 1
+    print(param, file=sys.stderr)
+    return rt.output(param)
+
+
 @workflow(executor=ActorExecutor)
 def workflowfunc(wf: Workflow):
     _in = wf.input()
-
-    a = wf.call("funca", {"a": _in["a"]})
-    b = wf.call("funcb", {"a": a})
-    return b
-
-
-workflow_i = workflowfunc.generate()
-dag = workflow_i.valicate()
-import json
-
-print(json.dumps(dag.metadata(fn_export=True), indent=2))
+    loader = wf.call("read_data", {"dataset": _in["dataset"], "name": _in["name"]})
+    processed = wf.call("process_data", {"loader": loader})
+    trained = wf.call("train", {"loader": processed})
+    return trained
 
 
 def actorWorkflowExportFunc(dict: dict):
-
     # just use for local invoke
     from lucas import routeBuilder
 
@@ -293,7 +324,6 @@ def actorWorkflowExportFunc(dict: dict):
 
 
 workflow_func = workflowfunc.export(actorWorkflowExportFunc)
-print("----first execute----")
-workflow_func({"a": 1})
-print("----second execute----")
-workflow_func({"a": 2})
+workflow_func({"dataset": "wikitext", "name": "wikitext-2-raw-v1"})
+
+q.put(None)

@@ -3,6 +3,7 @@ package dag
 import (
 	"github.com/asynkron/protoactor-go/actor"
 
+	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -55,7 +56,7 @@ type baseNodeRuntime[P Node] struct {
 	sessionId  string
 	node       P
 	store      *actor.PID
-	successors []*proto.Successor
+	successors []*messages.Successor
 }
 
 func (rt *baseNodeRuntime[P]) closeWith(ctx actor.Context, err error) {
@@ -71,7 +72,7 @@ func (rt *baseNodeRuntime[P]) closeWith(ctx actor.Context, err error) {
 	ctx.Stop(ctx.Self())
 }
 
-func (rt *baseNodeRuntime[P]) onAddEdge(ctx actor.Context, edge *proto.Successor) {
+func (rt *baseNodeRuntime[P]) onAddEdge(ctx actor.Context, edge *messages.Successor) {
 	ctx.Logger().Info("add edge",
 		"from", rt.node.ID(),
 		"to", edge.ID,

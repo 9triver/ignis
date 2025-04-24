@@ -13,7 +13,6 @@ enum CommandType {
   D_READY = 5;
   D_RETURN = 6;
   STREAM_CHUNK = 7;
-  STREAM_END = 8;
 }
 
 message AddHandler {
@@ -57,7 +56,6 @@ message Message {
     Ready Ready = 7;
     Return Return = 8;
     proto.StreamChunk StreamChunk = 9;
-    proto.StreamEnd StreamEnd = 10;
   }
 }
 
