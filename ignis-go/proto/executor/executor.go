@@ -1,11 +1,10 @@
 package executor
 
 import (
-	"errors"
-
 	pb "google.golang.org/protobuf/proto"
 
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/utils/errors"
 )
 
 func (ret *Return) Object() (*proto.EncodedObject, error) {

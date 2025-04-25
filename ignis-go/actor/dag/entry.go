@@ -5,7 +5,6 @@ import (
 
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/utils"
 )
 
 type EntryNodeRuntime struct {
@@ -71,17 +70,17 @@ func NewEntryNode(id string, value *proto.Flow) *EntryNode {
 
 type ExitNodeRuntime struct {
 	baseNodeRuntime[*ExitNode]
-	results utils.Map[string, *proto.Flow]
+	results map[string]*proto.Flow
 }
 
 func (rt *ExitNodeRuntime) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
-	ctx.Logger().Info("receive result",
+	ctx.Logger().Info("exit: receive result",
 		"exit", rt.node.id,
 		"param", invoke.Param,
 		"object", invoke.Value.ObjectID,
 		"session", rt.sessionId,
 	)
-	rt.results.Put(invoke.Param, invoke.Value)
+	rt.results[invoke.Param] = invoke.Value
 }
 
 func (rt *ExitNodeRuntime) Receive(ctx actor.Context) {
@@ -100,7 +99,7 @@ type ExitNode struct {
 func (node *ExitNode) newRuntime(sessionId string, storePID *actor.PID) *ExitNodeRuntime {
 	return &ExitNodeRuntime{
 		baseNodeRuntime: makeBaseNodeRuntime(node, sessionId, storePID),
-		results:         utils.MakeMap[string, *proto.Flow](),
+		results:         make(map[string]*proto.Flow),
 	}
 }
 

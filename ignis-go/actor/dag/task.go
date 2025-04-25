@@ -7,7 +7,6 @@ import (
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
 
@@ -21,7 +20,7 @@ type TaskHandlerProducer func(sessionId string, store *actor.PID) TaskHandler
 
 type TaskNode struct {
 	baseGraphNode
-	inputs          utils.Set[string]   // dependencies of the node
+	inputs          []string            // dependencies of the node
 	handlerProducer TaskHandlerProducer // handler producer of specified task
 }
 
@@ -29,7 +28,7 @@ func (node *TaskNode) Type() NodeType {
 	return TaskNodeType
 }
 
-func (node *TaskNode) Inputs() utils.Set[string] {
+func (node *TaskNode) Inputs() []string {
 	return node.inputs
 }
 
@@ -47,12 +46,12 @@ func (node *TaskNode) Props(sessionId string, store *actor.PID) *actor.Props {
 	})
 }
 
-func NewTaskNode(id string, inputs utils.Set[string], handler TaskHandlerProducer) *TaskNode {
+func NewTaskNode(id string, inputs []string, handler TaskHandlerProducer) *TaskNode {
 	return &TaskNode{
 		baseGraphNode: baseGraphNode{
 			id: id,
 		},
-		inputs:          inputs.Copy(),
+		inputs:          inputs,
 		handlerProducer: handler,
 	}
 }
@@ -63,7 +62,7 @@ type TaskNodeRuntime struct {
 }
 
 func (rt *TaskNodeRuntime) onTaskError(ctx actor.Context, err error) {
-	ctx.Logger().Error("invoke error",
+	ctx.Logger().Error("task: invoke error",
 		"node", rt.node.id,
 		"message", err.Error(),
 		"session", rt.sessionId,
@@ -136,7 +135,7 @@ func TaskNodeFromFunction(id string, f functions.Function) *TaskNode {
 	})
 }
 
-func TaskNodeFromPID(id string, params utils.Set[string], pid *actor.PID) *TaskNode {
+func TaskNodeFromPID(id string, params []string, pid *actor.PID) *TaskNode {
 	return NewTaskNode(id, params, func(sessionId string, store *actor.PID) TaskHandler {
 		return handlers.FromPID(sessionId, store, params, pid)
 	})

@@ -5,7 +5,6 @@ import (
 
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/utils"
 )
 
 type NodeType int
@@ -34,7 +33,7 @@ type Exit interface {
 
 type Task interface {
 	Node
-	Inputs() utils.Set[string]
+	Inputs() []string
 }
 
 type baseGraphNode struct {
@@ -60,7 +59,7 @@ type baseNodeRuntime[P Node] struct {
 }
 
 func (rt *baseNodeRuntime[P]) closeWith(ctx actor.Context, err error) {
-	ctx.Logger().Info("actor terminating",
+	ctx.Logger().Info("node: actor terminating",
 		"name", rt.node.ID(),
 		"session", rt.sessionId,
 		"error", err,
@@ -73,7 +72,7 @@ func (rt *baseNodeRuntime[P]) closeWith(ctx actor.Context, err error) {
 }
 
 func (rt *baseNodeRuntime[P]) onAddEdge(ctx actor.Context, edge *messages.Successor) {
-	ctx.Logger().Info("add edge",
+	ctx.Logger().Info("node: add edge",
 		"from", rt.node.ID(),
 		"to", edge.ID,
 		"param", edge.Param,

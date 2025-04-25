@@ -17,11 +17,11 @@ type baseTaskHandler struct {
 	inDegrees utils.Set[string]
 }
 
-func makeBaseTaskHandler(sessionId string, store *actor.PID, inDegrees utils.Set[string]) baseTaskHandler {
+func makeBaseTaskHandler(sessionId string, store *actor.PID, inDegrees []string) baseTaskHandler {
 	return baseTaskHandler{
 		sessionId: sessionId,
 		store:     store,
-		inDegrees: inDegrees.Copy(),
+		inDegrees: utils.MakeSetFromSlice(inDegrees),
 	}
 }
 
@@ -32,7 +32,7 @@ func (h *baseTaskHandler) ready() bool {
 type LocalTaskHandler struct {
 	baseTaskHandler
 	localFunc functions.Function
-	params    utils.Map[string, *proto.Flow]
+	params    map[string]*proto.Flow
 }
 
 func (h *LocalTaskHandler) InvokeAll(ctx actor.Context, successors []*messages.Successor) error {
@@ -81,7 +81,7 @@ func (h *LocalTaskHandler) InvokeOne(
 		return false, errors.Format("received unexpected param %s", param)
 	}
 
-	h.params.Put(param, obj)
+	h.params[param] = obj
 	h.inDegrees.Remove(param)
 
 	return h.ready(), nil
@@ -95,6 +95,6 @@ func FromFunction(sessionId string, store *actor.PID, f functions.Function) *Loc
 	return &LocalTaskHandler{
 		baseTaskHandler: makeBaseTaskHandler(sessionId, store, f.Params()),
 		localFunc:       f,
-		params:          utils.MakeMap[string, *proto.Flow](),
+		params:          make(map[string]*proto.Flow),
 	}
 }

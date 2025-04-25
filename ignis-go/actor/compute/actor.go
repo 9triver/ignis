@@ -7,29 +7,24 @@ import (
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/utils"
 )
 
 type Actor struct {
 	name     string
 	store    *actor.PID
 	executor *Executor
-	sessions utils.Map[string, *actor.PID]
+	sessions map[string]*actor.PID
 }
 
 func (a *Actor) Name() string {
 	return a.name
 }
 
-func (a *Actor) Deps() utils.Set[string] {
-	return a.executor.Deps()
-}
-
 func (a *Actor) newSession(ctx actor.Context, sessionId string, successors []*messages.Successor) *actor.PID {
 	ctx.Logger().Info("compute: create session", "actor", a.name, "session", sessionId)
-	props := NewSession(sessionId, a.store, a.executor, a.Deps(), successors)
+	props := NewSession(sessionId, a.store, a.executor, successors)
 	session, _ := ctx.SpawnNamed(props, sessionId)
-	a.sessions.Put(sessionId, session)
+	a.sessions[sessionId] = session
 	return session
 }
 
@@ -48,7 +43,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 		"param", invoke.Param,
 		"value", invoke.Value.ObjectID,
 	)
-	session, ok := a.sessions.Get(invoke.SessionID)
+	session, ok := a.sessions[invoke.SessionID]
 	if !ok {
 		ctx.Logger().Error("compute: session not found", "actor", a.name, "session", invoke.SessionID)
 		return
@@ -56,8 +51,8 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 
 	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj messages.Object, err error) {
 		if err != nil {
-			ctx.Logger().Error("fetch failed",
-				"a", a.name,
+			ctx.Logger().Error("compute: object fetch failed",
+				"actor", a.name,
 				"session", invoke.SessionID,
 				"object-id", obj.GetID(),
 			)
@@ -83,7 +78,7 @@ func NewActor(name string, handler functions.Function, store *actor.PID) *actor.
 			name:     name,
 			store:    store,
 			executor: NewExecutor(handler),
-			sessions: make(utils.Map[string, *actor.PID]),
+			sessions: make(map[string]*actor.PID),
 		}
 	})
 }

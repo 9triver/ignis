@@ -30,7 +30,7 @@ func (s *Session) ID() string {
 }
 
 func (s *Session) doInvoke(ctx actor.Context) {
-	ctx.Logger().Info("invoke started", "session", s.id)
+	ctx.Logger().Info("session: invoke started", "session", s.id)
 	exec := &ExecInput{
 		Context:   ctx,
 		SessionID: s.id,
@@ -99,8 +99,6 @@ func (s *Session) Receive(ctx actor.Context) {
 		s.onInvoke(ctx, msg)
 	case *actor.Stop:
 		s.executor.Close()
-	default:
-		ctx.Logger().Error("unknown message", "message", msg)
 	}
 }
 
@@ -108,7 +106,6 @@ func NewSession(
 	id string,
 	store *actor.PID,
 	executor *Executor,
-	deps utils.Set[string],
 	successors []*messages.Successor,
 ) *actor.Props {
 	return actor.PropsFromProducer(func() actor.Actor {
@@ -116,7 +113,7 @@ func NewSession(
 			id:         id,
 			store:      store,
 			executor:   executor,
-			deps:       deps.Copy(),
+			deps:       utils.MakeSetFromSlice(executor.Deps()),
 			params:     make(map[string]messages.Object),
 			successors: successors,
 		}

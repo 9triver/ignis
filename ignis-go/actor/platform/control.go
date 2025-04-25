@@ -15,7 +15,6 @@ import (
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
-	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
 
@@ -34,9 +33,8 @@ func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor)
 		"params", a.Params,
 	)
 	c.remotes[a.Name] = a.PID
-	params := utils.MakeSetFromSlice(a.Params)
-	node := dag.NewTaskNode(a.Name, params, func(sessionId string, store *actor.PID) dag.TaskHandler {
-		return handlers.FromPID(sessionId, store, params, a.PID)
+	node := dag.NewTaskNode(a.Name, a.Params, func(sessionId string, store *actor.PID) dag.TaskHandler {
+		return handlers.FromPID(sessionId, store, a.Params, a.PID)
 	})
 	c.nodes[a.Name] = node
 }

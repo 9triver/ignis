@@ -10,7 +10,6 @@ import (
 )
 
 type LocalStream struct {
-	store     *proto.StoreRef
 	once      sync.Once
 	mu        sync.RWMutex
 	consumers []chan Object
@@ -35,10 +34,6 @@ func (s *LocalStream) EnqueueChunk(chunk Object) {
 	s.values <- chunk
 }
 
-func (s *LocalStream) SetRemote(store *proto.StoreRef) {
-	s.store = store
-}
-
 func (s *LocalStream) GetID() string {
 	return s.id
 }
@@ -50,7 +45,6 @@ func (s *LocalStream) GetLanguage() proto.Language {
 func (s *LocalStream) GetEncoded() (*proto.EncodedObject, error) {
 	return &proto.EncodedObject{
 		ID:       s.id,
-		Source:   s.store,
 		Language: s.language,
 		Stream:   true,
 	}, nil
@@ -92,7 +86,7 @@ func (s *LocalStream) ToChan() <-chan Object {
 }
 
 func NewLocalStream(values any, language proto.Language) *LocalStream {
-	return NewLocalStreamWithID(utils.GenObjectID(), values, language)
+	return NewLocalStreamWithID(utils.GenIDWith("stream."), values, language)
 }
 
 func NewLocalStreamWithID(id string, values any, language proto.Language) *LocalStream {

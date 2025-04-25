@@ -8,7 +8,6 @@ import (
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/messages"
-	"github.com/9triver/ignis/utils"
 )
 
 type ExecInput struct {
@@ -23,7 +22,7 @@ type Executor struct {
 	handler  functions.Function
 }
 
-func (e *Executor) Deps() utils.Set[string] {
+func (e *Executor) Deps() []string {
 	return e.handler.Params()
 }
 

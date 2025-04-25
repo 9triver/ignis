@@ -6,6 +6,7 @@ import (
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/proto/cluster"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -20,35 +21,13 @@ type Actor struct {
 	remoteObjects map[string]utils.Future[messages.Object]
 }
 
-// SaveObject is sent to store when actor generates new return objects from functions
-type SaveObject struct {
-	Value    messages.Object                          // object or stream
-	Callback func(ctx actor.Context, ref *proto.Flow) // called when object saving is completed
-}
-
-// RequestObject is sent to store by **local** actors
-type RequestObject struct {
-	ReplyTo *actor.PID
-	Flow    *proto.Flow
-}
-
-// ObjectResponse is sent to request actor
-type ObjectResponse struct {
-	Value messages.Object
-	Error error
-}
-
-func (s *Actor) ID() string {
-	return s.id
-}
-
-func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
-	ctx.Logger().Info("responding object",
+func (s *Actor) onObjectRequest(ctx actor.Context, req *cluster.ObjectRequest) {
+	ctx.Logger().Info("store: responding object",
 		"id", req.ID,
 		"replyTo", req.ReplyTo.ID,
 	)
 
-	reply := &proto.ObjectResponse{ID: req.ID}
+	reply := &cluster.ObjectResponse{ID: req.ID}
 	obj, ok := s.localObjects[req.ID]
 	if !ok {
 		reply.Error = errors.Format("store: object %s not found", req.ID).Error()
@@ -61,9 +40,8 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 
 	// if requested object is a stream, send all chunks
 	if stream, ok := obj.(*messages.LocalStream); ok {
-		eos := proto.NewStreamEnd(req.ID)
 		go func() {
-			defer s.stub.SendTo(req.ReplyTo, eos)
+			defer s.stub.SendTo(req.ReplyTo, proto.NewStreamEnd(req.ID))
 			objects := stream.ToChan()
 			for obj := range objects {
 				encoded, err := obj.GetEncoded()
@@ -74,7 +52,7 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 	}
 }
 
-func (s *Actor) onObjectResponse(ctx actor.Context, resp *proto.ObjectResponse) {
+func (s *Actor) onObjectResponse(ctx actor.Context, resp *cluster.ObjectResponse) {
 	if resp.Error != "" {
 		ctx.Logger().Error("store: object response error",
 			"id", resp.ID,
@@ -134,10 +112,6 @@ func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
 		"id", obj.GetID(),
 	)
 
-	if stream, ok := obj.(*messages.LocalStream); ok {
-		stream.SetRemote(s.ref)
-	}
-
 	s.localObjects[obj.GetID()] = obj
 
 	if save.Callback != nil {
@@ -162,7 +136,7 @@ func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[messages.Obje
 	s.remoteObjects[flow.ObjectID] = fut
 
 	remoteRef := flow.Source
-	s.stub.SendTo(remoteRef, &proto.ObjectRequest{
+	s.stub.SendTo(remoteRef, &cluster.ObjectRequest{
 		ID:      flow.ObjectID,
 		ReplyTo: s.ref,
 	})
@@ -194,12 +168,12 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 func (s *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	// Requests from remote stores
-	case *proto.ObjectRequest:
+	case *cluster.ObjectRequest:
 		s.onObjectRequest(ctx, msg)
 	// Responses from remote stores
-	case *proto.ObjectResponse:
+	case *cluster.ObjectResponse:
 		s.onObjectResponse(ctx, msg)
-	case *proto.StreamChunk:
+	case *cluster.StreamChunk:
 		s.onStreamChunk(ctx, msg)
 	// Local actor requests
 	case *SaveObject:

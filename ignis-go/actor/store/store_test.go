@@ -117,7 +117,7 @@ func TestMultipleStores(t *testing.T) {
 			obj := msg.Value
 			if stream, ok := obj.(*messages.LocalStream); ok {
 				for i := range stream.ToChan() {
-					t.Logf("received %v", i)
+					t.Logf("received chunk %v", i)
 				}
 			} else {
 				t.Logf("received %v", obj)

@@ -12,7 +12,7 @@ import (
 
 // Object wraps LocalObject and EncodedObject, and both types support serialization.
 // Note that encoding/decoding an object maybe expensive, and Object should only used
-// when calling an actor.
+// when calling an actor function.
 type Object interface {
 	GetID() string
 	GetLanguage() proto.Language
@@ -71,7 +71,7 @@ func (obj *LocalObject) GetLanguage() proto.Language {
 }
 
 func NewLocalObject(value any, language proto.Language) *LocalObject {
-	return NewLocalObjectWithID(utils.GenObjectID(), value, language)
+	return NewLocalObjectWithID(utils.GenIDWith("obj."), value, language)
 }
 
 func NewLocalObjectWithID(id string, value any, language proto.Language) *LocalObject {

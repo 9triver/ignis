@@ -38,38 +38,11 @@ message EncodedObject {
   bool Stream = 5; // mark if the object is a stream
 }
 
-// ObjectRequest requests object with ID, and the object is sent to ReplyTo, asynchronously.
-// if the object is a stream, the stream **object** is sent to ReplyTo by ObjectRequest,
-// but no real stream chunk is transmitted.
-message ObjectRequest {
-  string ID = 1;
-  StoreRef ReplyTo = 2;
-}
-
-message ObjectResponse {
-  string ID = 1;
-  EncodedObject Value = 2;
-  string Error = 3;
-}
-
-// StreamRequest requests stream with ID, and the stream **content** is sent to ReplyTo by StreamChunks,
-// ending with StreamEnd message.
-//message StreamRequest {
-//  string StreamID = 1;
-//  StoreRef ReplyTo = 2;
-//}
-
 message StreamChunk {
   string StreamID = 1;
   bool EoS = 2;
-  EncodedObject Value = 3;
+  proto.EncodedObject Value = 3;
   string Error = 4;
-}
-
-// Generic Error message for platform
-message Error {
-  ActorRef Sender = 1;
-  string Message = 2;
 }
 
 // Invoke is sent to a dag node for workflow execution.

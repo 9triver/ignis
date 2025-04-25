@@ -41,8 +41,8 @@ type VenvManager struct {
 	em      remote.ExecutorManager
 	started map[string]bool
 
-	SystemExec string                         `json:"system_py"`
-	Envs       utils.Map[string, *VirtualEnv] `json:"envs"`
+	SystemExec string                 `json:"system_py"`
+	Envs       map[string]*VirtualEnv `json:"envs"`
 }
 
 func (m *VenvManager) ExecutorManager() remote.ExecutorManager {
@@ -136,7 +136,7 @@ func NewManager(ctx context.Context, manager remote.ExecutorManager) (*VenvManag
 		em:         manager,
 		started:    make(map[string]bool),
 		SystemExec: pythonExec,
-		Envs:       utils.MakeMap[string, *VirtualEnv](),
+		Envs:       make(map[string]*VirtualEnv),
 	}
 
 	if _, err := os.Stat(venvPath); os.IsNotExist(err) {

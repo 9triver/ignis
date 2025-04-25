@@ -2,9 +2,8 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"time"
-
-	"github.com/9triver/ignis/utils/errors"
 )
 
 type FutureDoneCallback[T any] func(future T, err error)
@@ -20,7 +19,7 @@ func NewFuture[T any](timeout time.Duration, callbacks ...FutureDoneCallback[T])
 	return newCtxFuture(timeout, callbacks...)
 }
 
-var timeout = errors.New("future: timeout")
+var ErrFutureTimeout = errors.New("future: timeout")
 
 type ctxFutureImpl[T any] struct {
 	ctx     context.Context
@@ -42,7 +41,7 @@ func (f *ctxFutureImpl[T]) onDone() {
 func (f *ctxFutureImpl[T]) Result() (T, error) {
 	<-f.ctx.Done()
 	if !f.done { // timeout
-		return f.value, timeout
+		return f.value, ErrFutureTimeout
 	}
 	return f.value, f.err
 }

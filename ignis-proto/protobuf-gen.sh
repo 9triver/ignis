@@ -7,7 +7,7 @@ ACTOR_SRC=$(go list -f {{.Dir}} github.com/asynkron/protoactor-go/actor)
 ACTOR_PROTO=$ACTOR_SRC/actor.proto
 
 PROTOC="$PROTOC -I $ACTOR_SRC -I ./messages"
-PROTO_SRC="./messages/*.proto ./messages/executor/*.proto ./messages/controller/*.proto"
+PROTO_SRC="./messages/*.proto ./messages/executor/*.proto ./messages/controller/*.proto ./messages/cluster/*.proto"
 
 if [ ! -d ./python ]; then
   echo "Creating output directory for Python: ./python"

@@ -2,8 +2,9 @@ package utils
 
 import (
 	"encoding/base64"
-	"errors"
 	"reflect"
+
+	"github.com/9triver/ignis/utils/errors"
 )
 
 func fieldsOf[T any]() (fields []string) {

@@ -21,7 +21,7 @@ type ChildTerminated struct {
 
 type Graph struct {
 	id      string
-	nodes   utils.Map[string, Node]
+	nodes   map[string]Node
 	entries utils.Set[string]
 	edges   utils.Set[*graphEdge]
 }
@@ -30,8 +30,8 @@ func (g *Graph) ID() string {
 	return g.id
 }
 
-func (g *Graph) Inputs() utils.Set[string] {
-	return g.entries
+func (g *Graph) Inputs() []string {
+	return g.entries.Values()
 }
 
 func (g *Graph) Type() NodeType {
@@ -39,26 +39,30 @@ func (g *Graph) Type() NodeType {
 }
 
 func (g *Graph) AppendNode(node Task) {
-	if g.nodes.Contains(node.ID()) {
+	if _, ok := g.nodes[node.ID()]; !ok {
 		return
 	}
-	g.nodes.Put(node.ID(), node)
+	g.nodes[node.ID()] = node
 }
 
 func (g *Graph) AddEntry(node Entry) {
-	if g.nodes.Contains(node.ID()) {
+	if _, ok := g.nodes[node.ID()]; !ok {
 		return
 	}
-	g.nodes.Put(node.ID(), node)
+	g.nodes[node.ID()] = node
 	g.entries.Add(node.ID())
 }
 
 func (g *Graph) AddEdge(from, to, param string) {
-	if !g.entries.Contains(from) && !g.nodes.Contains(to) {
+	_, ok1 := g.entries[from]
+	_, ok2 := g.nodes[from]
+	if !ok1 && !ok2 {
 		return
 	}
 
-	if g.entries.Contains(to) || !g.nodes.Contains(to) {
+	_, ok1 = g.entries[to]
+	_, ok2 = g.nodes[to]
+	if ok1 || !ok2 {
 		return
 	}
 
@@ -69,13 +73,13 @@ func (g *Graph) newRuntime(root bool, sessionId string, store *actor.PID) *Graph
 	return &GraphRuntime{
 		baseNodeRuntime: makeBaseNodeRuntime(g, sessionId, store),
 		root:            root,
-		actors:          utils.MakeMap[string, *actor.PID](),
+		actors:          make(map[string]*actor.PID),
 	}
 }
 
 func (g *Graph) RootProps(sessionId string, store *actor.PID) *actor.Props {
 	if sessionId == "" {
-		sessionId = utils.GenSessionID()
+		sessionId = utils.GenIDWith("session.")
 	}
 	return g.props(true, sessionId, store)
 }
@@ -105,13 +109,13 @@ func (g *Graph) props(root bool, sessionId string, store *actor.PID) *actor.Prop
 func New(id string, nodes ...Node) *Graph {
 	g := &Graph{
 		id:      id,
-		nodes:   utils.MakeMap[string, Node](),
+		nodes:   make(map[string]Node),
 		entries: utils.MakeSet[string](),
 		edges:   utils.MakeSet[*graphEdge](),
 	}
 
 	for _, node := range nodes {
-		g.nodes.Put(node.ID(), node)
+		g.nodes[node.ID()] = node
 		if node.Type() == EntryNodeType {
 			g.entries.Add(node.ID())
 		}
@@ -123,11 +127,11 @@ func New(id string, nodes ...Node) *Graph {
 type GraphRuntime struct {
 	baseNodeRuntime[*Graph]
 	root   bool
-	actors utils.Map[string, *actor.PID]
+	actors map[string]*actor.PID
 }
 
 func (rt *GraphRuntime) closeWith(ctx actor.Context, err error) {
-	ctx.Logger().Info("actor terminating",
+	ctx.Logger().Info("graph: terminating",
 		"name", rt.node.ID(),
 		"session", rt.sessionId,
 		"error", err,
@@ -148,7 +152,7 @@ func (rt *GraphRuntime) onChildTerminated(ctx actor.Context, term *ChildTerminat
 	if term.Error == nil {
 		return
 	}
-	ctx.Logger().Error("graph failed",
+	ctx.Logger().Error("graph: child failed",
 		"node", term.PID,
 		"reason", term.Error,
 		"graph", rt.node.id,
@@ -159,7 +163,7 @@ func (rt *GraphRuntime) onChildTerminated(ctx actor.Context, term *ChildTerminat
 
 func (rt *GraphRuntime) onInvoke(ctx actor.Context, _ *proto.Invoke) {
 	ctx.Logger().Warn(
-		"ignoring invoke",
+		"graph: ignoring invoke",
 		"reason", "graph node does not support invoke currently",
 		"graph", rt.node.id,
 		"session", rt.sessionId,
@@ -172,7 +176,7 @@ func (rt *GraphRuntime) onInvokeEmpty(ctx actor.Context) {
 		"session", rt.sessionId,
 	)
 	for entry := range rt.node.entries {
-		pid, ok := rt.actors.Get(entry)
+		pid, ok := rt.actors[entry]
 		if !ok {
 			continue
 		}

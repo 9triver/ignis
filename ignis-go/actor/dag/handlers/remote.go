@@ -5,7 +5,6 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/utils"
 )
 
 type RemoteTaskHandler struct {
@@ -40,7 +39,7 @@ func (h *RemoteTaskHandler) InvokeEmpty(ctx actor.Context, successors []*message
 	return h.ready(), nil
 }
 
-func FromPID(sessionId string, store *actor.PID, params utils.Set[string], pid *actor.PID) *RemoteTaskHandler {
+func FromPID(sessionId string, store *actor.PID, params []string, pid *actor.PID) *RemoteTaskHandler {
 	return &RemoteTaskHandler{
 		baseTaskHandler: makeBaseTaskHandler(sessionId, store, params),
 		pid:             pid,

@@ -4,6 +4,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+
+	"github.com/lithammer/shortuuid/v4"
 )
 
 func Logger(logPaths ...string) *slog.Logger {
@@ -19,4 +21,12 @@ func Logger(logPaths ...string) *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.MultiWriter(writers...), &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
+}
+
+func GenID() string {
+	return shortuuid.New()
+}
+
+func GenIDWith(prefix string) string {
+	return prefix + shortuuid.New()
 }
