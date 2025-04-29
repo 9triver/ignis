@@ -45,6 +45,8 @@ message StreamChunk {
   string Error = 4;
 }
 
+message InvokeEmpty {}
+
 // Invoke is sent to a dag node for workflow execution.
 message Invoke {
   string SessionID = 1;
@@ -53,5 +55,12 @@ message Invoke {
   string Error = 4;
 }
 
-// InvokeEmpty is sent to entry nodes of the dag.
-message InvokeEmpty {}
+message InvokeStart {
+  string SessionID = 1;
+  ActorRef ReplyTo = 2;
+}
+
+message InvokeRemote {
+  ActorRef Target = 1;
+  Invoke Invoke = 2;
+}

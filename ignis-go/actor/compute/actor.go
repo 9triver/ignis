@@ -16,24 +16,21 @@ type Actor struct {
 	sessions map[string]*actor.PID
 }
 
-func (a *Actor) Name() string {
-	return a.name
-}
-
-func (a *Actor) newSession(ctx actor.Context, sessionId string, successors []*messages.Successor) *actor.PID {
+func (a *Actor) newSession(ctx actor.Context, sessionId string) *actor.PID {
 	ctx.Logger().Info("compute: create session", "actor", a.name, "session", sessionId)
-	props := NewSession(sessionId, a.store, a.executor, successors)
-	session, _ := ctx.SpawnNamed(props, sessionId)
+	props := NewSession(sessionId, a.store, a.executor)
+	session, _ := ctx.SpawnNamed(props, "session."+sessionId)
 	a.sessions[sessionId] = session
 	return session
 }
 
-func (a *Actor) onCreateSession(ctx actor.Context, create *messages.CreateSession) {
-	if _, ok := a.sessions[create.SessionID]; ok {
-		ctx.Logger().Warn("compute: session exists, ignoring", "actor", a.name, "session", create.SessionID)
-		return
+func (a *Actor) onInvokeStart(ctx actor.Context, start *proto.InvokeStart) {
+	session, ok := a.sessions[start.SessionID]
+	if !ok {
+		session = a.newSession(ctx, start.SessionID)
+		a.sessions[start.SessionID] = session
 	}
-	a.sessions[create.SessionID] = a.newSession(ctx, create.SessionID, create.Successors)
+	ctx.Send(session, &SessionStart{ReplyTo: start.ReplyTo})
 }
 
 func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
@@ -45,8 +42,8 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 	)
 	session, ok := a.sessions[invoke.SessionID]
 	if !ok {
-		ctx.Logger().Error("compute: session not found", "actor", a.name, "session", invoke.SessionID)
-		return
+		session = a.newSession(ctx, invoke.SessionID)
+		a.sessions[invoke.SessionID] = session
 	}
 
 	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj messages.Object, err error) {
@@ -65,8 +62,8 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 
 func (a *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *messages.CreateSession:
-		a.onCreateSession(ctx, msg)
+	case *proto.InvokeStart:
+		a.onInvokeStart(ctx, msg)
 	case *proto.Invoke:
 		a.onInvoke(ctx, msg)
 	}

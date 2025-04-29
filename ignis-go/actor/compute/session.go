@@ -5,19 +5,18 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 
-	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
 
 type Session struct {
-	id         string
-	store      *actor.PID
-	executor   *Executor
-	deps       utils.Set[string]
-	params     map[string]messages.Object
-	successors []*messages.Successor
+	id       string
+	store    *actor.PID
+	executor *Executor
+	params   map[string]messages.Object
+	replyTo  *proto.ActorRef
+	deps     utils.Set[string]
 }
 
 type SessionInvoke struct {
@@ -25,26 +24,55 @@ type SessionInvoke struct {
 	Value messages.Object
 }
 
-func (s *Session) ID() string {
-	return s.id
+type SessionStart struct {
+	ReplyTo *proto.ActorRef
+}
+
+func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
+	ctx.Logger().Info("session: receive invoke", "session", s.id, "param", invoke.Param)
+	s.params[invoke.Param] = invoke.Value
+	s.deps.Remove(invoke.Param)
+
+	if s.deps.Empty() && s.replyTo != nil {
+		s.doInvoke(ctx)
+	}
+}
+
+func (s *Session) onStart(ctx actor.Context, start *SessionStart) {
+	ctx.Logger().Info("session: start execution", "session", s.id, "replyTo", start.ReplyTo.ID)
+	s.replyTo = start.ReplyTo
+	if s.deps.Empty() && s.replyTo != nil {
+		s.doInvoke(ctx)
+	}
 }
 
 func (s *Session) doInvoke(ctx actor.Context) {
-	ctx.Logger().Info("session: invoke started", "session", s.id)
 	exec := &ExecInput{
 		Context:   ctx,
 		SessionID: s.id,
 		Params:    s.params,
 		OnDone: func(obj messages.Object, err error, duration time.Duration) {
 			if err != nil {
-				s.sendError(ctx, err)
+				ctx.Send(s.store, &proto.InvokeRemote{
+					Target: s.replyTo,
+					Invoke: &proto.Invoke{
+						SessionID: s.id,
+						Error:     err.Error(),
+					},
+				})
 				return
 			}
 
-			save := &store.SaveObject{
+			save := &messages.SaveObject{
 				Value: obj,
 				Callback: func(ctx actor.Context, ref *proto.Flow) {
-					s.sendResult(ctx, ref)
+					ctx.Send(s.store, &proto.InvokeRemote{
+						Target: s.replyTo,
+						Invoke: &proto.Invoke{
+							SessionID: s.id,
+							Value:     ref,
+						},
+					})
 				},
 			}
 			ctx.Send(s.store, save)
@@ -53,50 +81,12 @@ func (s *Session) doInvoke(ctx actor.Context) {
 	s.executor.Requests() <- exec
 }
 
-func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
-	ctx.Logger().Info("session: receive invoke", "session", s.id, "param", invoke.Param)
-	s.enqueue(invoke.Param, invoke.Value)
-	if s.ready() {
-		s.doInvoke(ctx)
-	}
-}
-
-func (s *Session) enqueue(param string, obj messages.Object) {
-	if !s.deps.Contains(param) {
-		return
-	}
-	s.params[param] = obj
-	s.deps.Remove(param)
-}
-
-func (s *Session) ready() bool {
-	return s.deps.Empty()
-}
-
-func (s *Session) sendError(ctx actor.Context, err error) {
-	for _, succ := range s.successors {
-		ctx.Send(succ.PID, &proto.Invoke{
-			SessionID: s.id,
-			Param:     succ.Param,
-			Error:     err.Error(),
-		})
-	}
-}
-
-func (s *Session) sendResult(ctx actor.Context, obj *proto.Flow) {
-	for _, succ := range s.successors {
-		ctx.Send(succ.PID, &proto.Invoke{
-			SessionID: s.id,
-			Param:     succ.Param,
-			Value:     obj,
-		})
-	}
-}
-
 func (s *Session) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *SessionInvoke:
 		s.onInvoke(ctx, msg)
+	case *SessionStart:
+		s.onStart(ctx, msg)
 	case *actor.Stop:
 		s.executor.Close()
 	}
@@ -106,16 +96,14 @@ func NewSession(
 	id string,
 	store *actor.PID,
 	executor *Executor,
-	successors []*messages.Successor,
 ) *actor.Props {
 	return actor.PropsFromProducer(func() actor.Actor {
 		return &Session{
-			id:         id,
-			store:      store,
-			executor:   executor,
-			deps:       utils.MakeSetFromSlice(executor.Deps()),
-			params:     make(map[string]messages.Object),
-			successors: successors,
+			id:       id,
+			store:    store,
+			executor: executor,
+			params:   make(map[string]messages.Object),
+			deps:     utils.MakeSetFromSlice(executor.Deps()),
 		}
 	})
 }

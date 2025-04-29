@@ -1,14 +1,20 @@
-package store
+package messages
 
 import (
-	"github.com/9triver/ignis/messages"
-	"github.com/9triver/ignis/proto"
 	"github.com/asynkron/protoactor-go/actor"
+	pb "google.golang.org/protobuf/proto"
+
+	"github.com/9triver/ignis/proto"
 )
+
+type ForwardMessage interface {
+	pb.Message
+	GetTarget() *proto.ActorRef
+}
 
 // SaveObject is sent to store when actor generates new return objects from functions
 type SaveObject struct {
-	Value    messages.Object                          // object or stream
+	Value    Object                                   // object or stream
 	Callback func(ctx actor.Context, ref *proto.Flow) // called when object saving is completed
 }
 
@@ -20,6 +26,6 @@ type RequestObject struct {
 
 // ObjectResponse is sent to request actor
 type ObjectResponse struct {
-	Value messages.Object
+	Value Object
 	Error error
 }

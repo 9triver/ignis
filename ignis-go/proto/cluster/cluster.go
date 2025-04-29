@@ -48,3 +48,16 @@ func NewEnvelope(store *proto.StoreRef, msg pb.Message) *Envelope {
 	}
 	return e
 }
+
+func (e *Envelope) Unwrap() pb.Message {
+	switch msg := e.Message.(type) {
+	case *Envelope_ObjectRequest:
+		return msg.ObjectRequest
+	case *Envelope_ObjectResponse:
+		return msg.ObjectResponse
+	case *Envelope_StreamChunk:
+		return msg.StreamChunk
+	default:
+		return nil
+	}
+}

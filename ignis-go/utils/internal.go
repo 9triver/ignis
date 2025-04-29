@@ -137,3 +137,58 @@ func MapToStruct[I any](invoke map[string]any) (ret I, err error) {
 
 	return input, nil
 }
+
+func MapToStruct2(t reflect.Type, value any) (ret reflect.Value, err error) {
+	asValue := true
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+		asValue = false
+	}
+	vType := reflect.TypeOf(value)
+	if t.Kind() != reflect.Struct || vType != reflect.TypeFor[map[string]any]() {
+		err = errors.New("map non-struct type")
+		return
+	}
+
+	invoke := value.(map[string]any)
+	dst := reflect.New(t)
+	for i := range t.NumField() {
+		field := t.Field(i)
+		v, ok := invoke[field.Name]
+		if !ok {
+			continue
+		}
+
+		fieldValue := dst.Elem().Field(i)
+		fieldType := field.Type
+
+		var rv reflect.Value
+		if fieldType.Kind() == reflect.Struct ||
+			(fieldType.Kind() == reflect.Pointer && fieldType.Elem().Kind() == reflect.Struct) {
+			child, err := MapToStruct2(fieldType, v)
+			if err != nil {
+				return ret, err
+			}
+			rv = child
+		} else {
+			rv = reflect.ValueOf(v)
+		}
+
+		if !rv.CanConvert(fieldType) {
+			err = errors.New("invalid type")
+			return
+		}
+
+		if !fieldValue.CanSet() {
+			err = errors.New("cannot set field")
+			return
+		}
+
+		fieldValue.Set(rv.Convert(fieldType))
+	}
+
+	if asValue {
+		dst = dst.Elem()
+	}
+	return dst, nil
+}

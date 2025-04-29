@@ -3,6 +3,7 @@ package store
 import (
 	"github.com/asynkron/protoactor-go/actor"
 
+	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
@@ -14,7 +15,7 @@ import (
 type Actor struct {
 	id   string
 	ref  *proto.StoreRef
-	stub Stub
+	stub remote.Stub
 	// localObjects saves objects generated from current system
 	localObjects map[string]messages.Object
 	// remoteObjects saves objects from remote stores
@@ -106,7 +107,7 @@ func (s *Actor) onStreamChunk(ctx actor.Context, chunk *proto.StreamChunk) {
 	}
 }
 
-func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
+func (s *Actor) onSaveObject(ctx actor.Context, save *messages.SaveObject) {
 	obj := save.Value
 	ctx.Logger().Info("store: save object",
 		"id", obj.GetID(),
@@ -143,7 +144,7 @@ func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[messages.Obje
 	return fut
 }
 
-func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
+func (s *Actor) onFlowRequest(ctx actor.Context, req *messages.RequestObject) {
 	ctx.Logger().Info("store: local flow request",
 		"id", req.Flow.ObjectID,
 		"store", req.Flow.Source.ID,
@@ -151,17 +152,27 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 
 	if req.Flow.Source.ID == s.ref.ID {
 		obj, err := s.getLocalObject(req.Flow)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
+		ctx.Send(req.ReplyTo, &messages.ObjectResponse{
 			Value: obj,
 			Error: err,
 		})
 	} else {
 		s.requestRemoteObject(req.Flow).OnDone(func(obj messages.Object, err error) {
-			ctx.Send(req.ReplyTo, &ObjectResponse{
+			ctx.Send(req.ReplyTo, &messages.ObjectResponse{
 				Value: obj,
 				Error: err,
 			})
 		})
+	}
+}
+
+func (s *Actor) onForward(ctx actor.Context, forward messages.ForwardMessage) {
+	target := forward.GetTarget()
+	if target.Store.Equals(s.ref) { // target is local
+		ctx.Send(target.PID, forward)
+	} else {
+		ctx.Logger().Info("store: forwarding request")
+		s.stub.SendTo(target.Store, forward)
 	}
 }
 
@@ -176,14 +187,17 @@ func (s *Actor) Receive(ctx actor.Context) {
 	case *cluster.StreamChunk:
 		s.onStreamChunk(ctx, msg)
 	// Local actor requests
-	case *SaveObject:
+	case *messages.SaveObject:
 		s.onSaveObject(ctx, msg)
-	case *RequestObject:
+	case *messages.RequestObject:
 		s.onFlowRequest(ctx, msg)
+	// forward messages
+	case messages.ForwardMessage:
+		s.onForward(ctx, msg)
 	}
 }
 
-func New(stub Stub, id string) *actor.Props {
+func New(stub remote.Stub, id string) *actor.Props {
 	s := &Actor{
 		id:            id,
 		stub:          stub,
@@ -197,6 +211,25 @@ func New(stub Stub, id string) *actor.Props {
 	}))
 }
 
+func Spawn(ctx actor.SpawnerContext, stub remote.Stub, id string) *proto.StoreRef {
+	s := &Actor{
+		id:            id,
+		stub:          stub,
+		localObjects:  make(map[string]messages.Object),
+		remoteObjects: make(map[string]utils.Future[messages.Object]),
+	}
+	props := actor.PropsFromProducer(func() actor.Actor {
+		return s
+	})
+	pid, _ := ctx.SpawnNamed(props, "store."+id)
+	ref := &proto.StoreRef{
+		ID:  id,
+		PID: pid,
+	}
+	s.ref = ref
+	return ref
+}
+
 // GetObject can be called by actors within the same system
 // It returns a future that resolves to the object or rejects with an error
 func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Future[messages.Object] {
@@ -208,7 +241,7 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 
 	props := actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
-		case *ObjectResponse:
+		case *messages.ObjectResponse:
 			if msg.Error != nil {
 				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ObjectID))
 				return
@@ -225,7 +258,7 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 	})
 
 	flowActor := ctx.Spawn(props)
-	ctx.Send(store, &RequestObject{
+	ctx.Send(store, &messages.RequestObject{
 		ReplyTo: flowActor,
 		Flow:    flow,
 	})

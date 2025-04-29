@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -20,4 +21,24 @@ func TestFuture(t *testing.T) {
 	} else {
 		t.Log(v)
 	}
+}
+
+func TestMapStruct(t *testing.T) {
+	type B struct {
+		B int
+	}
+	type A struct {
+		A int
+		B *B
+	}
+
+	m := map[string]any{
+		"A": 1,
+		"B": map[string]any{
+			"B": 2,
+		},
+	}
+
+	a, err := MapToStruct2(reflect.TypeFor[A](), m)
+	t.Log(a, err)
 }

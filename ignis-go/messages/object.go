@@ -10,8 +10,8 @@ import (
 	"github.com/9triver/ignis/utils/errors"
 )
 
-// Object wraps LocalObject and EncodedObject, and both types support serialization.
-// Note that encoding/decoding an object maybe expensive, and Object should only used
+// Object wraps LocalObject, LocalStream and proto.EncodedObject, and all these types support serialization.
+// Note that encoding/decoding an object maybe expensive, and Object should only be used
 // when calling an actor function.
 type Object interface {
 	GetID() string
@@ -19,6 +19,12 @@ type Object interface {
 	GetEncoded() (*proto.EncodedObject, error)
 	GetValue() (any, error)
 }
+
+var (
+	_ Object = (*LocalObject)(nil)
+	_ Object = (*proto.EncodedObject)(nil)
+	_ Object = (*LocalStream)(nil)
+)
 
 type LocalObject struct {
 	id       string
@@ -81,9 +87,3 @@ func NewLocalObjectWithID(id string, value any, language proto.Language) *LocalO
 		language: language,
 	}
 }
-
-var (
-	_ Object = (*LocalObject)(nil)
-	_ Object = (*proto.EncodedObject)(nil)
-	_ Object = (*LocalStream)(nil)
-)

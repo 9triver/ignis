@@ -2,6 +2,7 @@ package actor_test
 
 import (
 	"context"
+
 	"path"
 	"testing"
 	"time"
@@ -13,15 +14,15 @@ import (
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/functions/python"
-	"github.com/9triver/ignis/actor/platform"
+	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/actor/remote/rpc"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
-	"github.com/9triver/ignis/utils"
 )
 
 func rpcClient(storePID, computePID *actor.PID) {
@@ -88,9 +89,7 @@ func TestRemoteTask(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	storeProps := store.New(nil, "store")
-	storePID := sys.Root.Spawn(storeProps)
-
+	storeRef := store.Spawn(sys.Root, remote.NewActorStub(sys), "store")
 	type Input struct {
 		A int
 		B int
@@ -99,102 +98,20 @@ func TestRemoteTask(t *testing.T) {
 	taskFunc := functions.NewGo("graph-task", func(args Input) (ret int, err error) {
 		return args.A + args.B, nil
 	}, proto.LangJson)
-	computePID := sys.Root.Spawn(compute.NewActor("graph-task", taskFunc, storePID))
+	computePID := sys.Root.Spawn(compute.NewActor("graph-task", taskFunc, storeRef.PID))
 
 	go func() {
 		_ = cm.Run(ctx)
 	}()
 	<-time.After(1 * time.Second)
-	go rpcClient(storePID, computePID)
+	go rpcClient(storeRef.PID, computePID)
 
 	venvs, err := python.NewManager(context.TODO(), em)
 	if err != nil {
 		panic(err)
 	}
-	c, props := platform.NewTaskController(storePID, venvs, cm)
-	pid := sys.Root.Spawn(props)
 
-	go func() {
-		for msg := range c.RecvChan() {
-			sys.Root.Send(pid, msg)
-		}
-	}()
-
-	<-time.After(30 * time.Second)
-}
-
-func TestRemoteStream(t *testing.T) {
-	storeProps := store.New(nil, "store")
-	sys := actor.NewActorSystem(utils.WithLogger())
-	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
-
-	type N struct {
-		Num int
-	}
-
-	type I struct {
-		Ints <-chan int
-	}
-
-	type O struct {
-		Sum int
-	}
-
-	generateInts := func(input N) (<-chan int, error) {
-		ch := make(chan int)
-		go func() {
-			defer close(ch)
-			for i := range input.Num {
-				ch <- i
-			}
-		}()
-
-		return ch, nil
-	}
-
-	getSum := func(input I) (O, error) {
-		sum := 0
-		for i := range input.Ints {
-			println(i)
-			sum += i
-		}
-		return O{Sum: sum}, nil
-	}
-
-	f1 := functions.NewGo("genInts", generateInts, proto.LangJson)
-	f2 := functions.NewGo("getSum", getSum, proto.LangJson)
-
-	props1 := compute.NewActor("f1", f1, storePID)
-	props2 := compute.NewActor("f2", f2, storePID)
-	pid1 := sys.Root.Spawn(props1)
-	pid2 := sys.Root.Spawn(props2)
-
-	sys.Root.Send(pid1, &messages.CreateSession{
-		SessionID: "test",
-		Successors: []*messages.Successor{
-			{
-				ID:    "f2",
-				Param: "Ints",
-				PID:   pid2,
-			},
-		},
-	})
-
-	sys.Root.Send(pid2, &messages.CreateSession{
-		SessionID:  "test",
-		Successors: []*messages.Successor{},
-	})
-
-	sys.Root.Send(storePID, &store.SaveObject{
-		Value: messages.NewLocalObject(10, proto.LangJson),
-		Callback: func(ctx actor.Context, ref *proto.Flow) {
-			ctx.Send(pid1, &proto.Invoke{
-				SessionID: "test",
-				Param:     "Num",
-				Value:     ref,
-			})
-		},
-	})
-
-	<-time.After(100 * time.Second)
+	wait := make(chan struct{})
+	control.SpawnTaskController(sys.Root, storeRef, venvs, cm, func() { close(wait) })
+	<-wait
 }

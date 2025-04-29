@@ -70,3 +70,17 @@ func (obj *EncodedObject) GetValue() (any, error) {
 	}
 	return obj.asObject()
 }
+
+func (ref *StoreRef) Equals(other *StoreRef) bool {
+	if other == nil {
+		return false
+	}
+	return ref.ID == other.ID
+}
+
+func (ref *ActorRef) Equals(other *ActorRef) bool {
+	if other == nil {
+		return false
+	}
+	return ref.ID == other.ID && ref.Store.Equals(other.Store)
+}

@@ -1,4 +1,4 @@
-package platform
+package control
 
 import (
 	"fmt"
@@ -6,13 +6,11 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 
-	"github.com/9triver/ignis/actor/dag"
-	"github.com/9triver/ignis/actor/dag/handlers"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/remote"
-	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/utils/errors"
@@ -21,10 +19,9 @@ import (
 type Controller struct {
 	manager    *python.VenvManager
 	controller remote.Controller
-	storePID   *actor.PID
-	nodes      map[string]dag.Task
+	store      *proto.StoreRef
+	nodes      map[string]*task.Node
 	runtimes   map[string]*actor.PID
-	remotes    map[string]*actor.PID
 }
 
 func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
@@ -32,9 +29,8 @@ func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor)
 		"name", a.Name,
 		"params", a.Params,
 	)
-	c.remotes[a.Name] = a.PID
-	node := dag.NewTaskNode(a.Name, a.Params, func(sessionId string, store *actor.PID) dag.TaskHandler {
-		return handlers.FromPID(sessionId, store, a.Params, a.PID)
+	node := task.NewNode(a.Name, a.Params, func(sessionId string, store *actor.PID) task.Handler {
+		return task.HandlerFromPID(sessionId, store, a.Params, a.PID)
 	})
 	c.nodes[a.Name] = node
 }
@@ -48,8 +44,8 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 	if err != nil {
 		panic(err)
 	}
-	node := dag.NewTaskNode(f.Name, pyFunc.Params(), func(sessionId string, store *actor.PID) dag.TaskHandler {
-		return handlers.FromFunction(sessionId, store, pyFunc)
+	node := task.NewNode(f.Name, pyFunc.Params(), func(sessionId string, store *actor.PID) task.Handler {
+		return task.HandlerFromFunction(sessionId, store, pyFunc)
 	})
 	c.nodes[f.Name] = node
 }
@@ -60,7 +56,7 @@ func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData
 		"id", obj.ID,
 		"session", data.SessionID,
 	)
-	ctx.Send(c.storePID, &store.SaveObject{
+	ctx.Send(c.store.PID, &messages.SaveObject{
 		Value: obj,
 		Callback: func(ctx actor.Context, ref *proto.Flow) {
 			ret := controller.NewReturnResult(data.SessionID, "", obj.ID, ref, nil)
@@ -76,36 +72,21 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 		"session", arg.SessionID,
 		"instance", arg.InstanceID,
 	)
-	sessionId := fmt.Sprintf("%s.%s", arg.SessionID, arg.InstanceID)
-	name := fmt.Sprintf("%s::%s", arg.Name, sessionId)
-	pid, ok := c.runtimes[name]
+	sessionId := fmt.Sprintf("%s::%s::%s", arg.Name, arg.SessionID, arg.InstanceID)
+	pid, ok := c.runtimes[sessionId]
 	if !ok {
 		node, ok := c.nodes[arg.Name]
 		if !ok {
 			return
 		}
 
-		props := node.Props(sessionId, c.storePID)
-		pid = ctx.Spawn(props)
-		ctx.Send(pid, &messages.Successor{
-			ID:    "store",
+		props := node.Props(sessionId, c.store.PID, &proto.ActorRef{
+			Store: c.store,
+			ID:    "controller",
 			PID:   ctx.Self(),
-			Param: arg.Name,
 		})
-		c.runtimes[name] = pid
-
-		if remotePID, ok := c.remotes[arg.Name]; ok {
-			ctx.Send(remotePID, &messages.CreateSession{
-				SessionID: sessionId,
-				Successors: []*messages.Successor{
-					{
-						ID:    "store",
-						PID:   ctx.Self(),
-						Param: arg.Name,
-					},
-				},
-			})
-		}
+		pid, _ = ctx.SpawnNamed(props, "runtime."+sessionId)
+		c.runtimes[sessionId] = pid
 	}
 
 	switch v := arg.Value.Object.(type) {
@@ -117,7 +98,7 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 		}
 		ctx.Send(pid, invoke)
 	case *controller.Data_Encoded:
-		save := &store.SaveObject{
+		save := &messages.SaveObject{
 			Value: v.Encoded,
 			Callback: func(ctx actor.Context, ref *proto.Flow) {
 				invoke := &proto.Invoke{
@@ -128,7 +109,7 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 				ctx.Send(pid, invoke)
 			},
 		}
-		ctx.Send(c.storePID, save)
+		ctx.Send(c.store.PID, save)
 	}
 }
 
@@ -151,20 +132,21 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 	}
 }
 
-func (c *Controller) onReturn(ctx actor.Context, ret *proto.Invoke) {
-	splits := strings.SplitN(ret.SessionID, ".", 2)
-	sessionId, instanceId := splits[0], splits[1]
+func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeRemote) {
+	ret := ir.Invoke
+	splits := strings.SplitN(ret.SessionID, "::", 3)
+	name, sessionId, instanceId := splits[0], splits[1], splits[2]
 	ctx.Logger().Info("control: execution done",
-		"name", ret.Param,
+		"name", name,
 		"session", sessionId,
 		"instance", instanceId,
 	)
 
 	var msg *controller.Message
 	if ret.Error != "" {
-		msg = controller.NewReturnResult(sessionId, instanceId, ret.Param, nil, errors.New(ret.Error))
+		msg = controller.NewReturnResult(sessionId, instanceId, name, nil, errors.New(ret.Error))
 	} else {
-		msg = controller.NewReturnResult(sessionId, instanceId, ret.Param, ret.Value, nil)
+		msg = controller.NewReturnResult(sessionId, instanceId, name, ret.Value, nil)
 	}
 	c.controller.SendChan() <- msg
 }
@@ -173,21 +155,39 @@ func (c *Controller) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *controller.Message:
 		c.onControllerMessage(ctx, msg)
-	case *proto.Invoke:
+	case *proto.InvokeRemote:
 		c.onReturn(ctx, msg)
 	}
 }
 
-func NewTaskController(store *actor.PID, venvs *python.VenvManager, cm remote.ControllerManager) (remote.Controller, *actor.Props) {
+func SpawnTaskController(
+	ctx *actor.RootContext,
+	store *proto.StoreRef,
+	venvs *python.VenvManager,
+	cm remote.ControllerManager,
+	onClose func(),
+) *proto.ActorRef {
 	c := cm.NextController()
-	return c, actor.PropsFromProducer(func() actor.Actor {
+	props := actor.PropsFromProducer(func() actor.Actor {
 		return &Controller{
 			manager:    venvs,
 			controller: c,
-			storePID:   store,
-			nodes:      make(map[string]dag.Task),
+			store:      store,
+			nodes:      make(map[string]*task.Node),
 			runtimes:   make(map[string]*actor.PID),
-			remotes:    make(map[string]*actor.PID),
 		}
 	})
+	pid, _ := ctx.SpawnNamed(props, "controller")
+	go func() {
+		defer onClose()
+		for msg := range c.RecvChan() {
+			ctx.Send(pid, msg)
+		}
+	}()
+
+	return &proto.ActorRef{
+		Store: store,
+		ID:    "controller",
+		PID:   pid,
+	}
 }
