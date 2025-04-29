@@ -15,8 +15,6 @@ type GoFunction[I, O any] struct {
 	language proto.Language
 }
 
-var _ Function = (*GoFunction[any, any])(nil)
-
 func (h *GoFunction[I, O]) Call(params map[string]messages.Object) (messages.Object, error) {
 	invoke := make(map[string]any)
 	for k, v := range params {

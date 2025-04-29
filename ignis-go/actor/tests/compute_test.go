@@ -2,7 +2,6 @@ package actor_test
 
 import (
 	"context"
-	"log/slog"
 	"path"
 	"testing"
 	"time"
@@ -126,10 +125,7 @@ func TestRemoteTask(t *testing.T) {
 
 func TestRemoteStream(t *testing.T) {
 	storeProps := store.New(nil, "store")
-	sys := actor.NewActorSystem(actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
-		logger := utils.Logger()
-		return logger.With("system", system.ID)
-	}))
+	sys := actor.NewActorSystem(utils.WithLogger())
 	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
 
 	type N struct {

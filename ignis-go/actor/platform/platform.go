@@ -2,7 +2,6 @@ package platform
 
 import (
 	"context"
-	"log/slog"
 	"path"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -46,9 +45,7 @@ func (p *Platform) Run() error {
 }
 
 func NewPlatform(ctx context.Context) *Platform {
-	opt := actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
-		return utils.Logger()
-	})
+	opt := utils.WithLogger()
 	rpcAddr := "127.0.0.1:8080"
 	ipcAddr := "ipc://" + path.Join(configs.StoragePath, "em-ipc")
 

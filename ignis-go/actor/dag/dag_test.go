@@ -1,7 +1,6 @@
 package dag
 
 import (
-	"log/slog"
 	"testing"
 	"time"
 
@@ -31,9 +30,7 @@ func demoFunc(input Input) (Output, error) {
 func TestDAGWithLocal(t *testing.T) {
 	var nodes []Node
 	storeProps := store.New(nil, "store")
-	sys := actor.NewActorSystem(actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
-		return utils.Logger()
-	}))
+	sys := actor.NewActorSystem(utils.WithLogger())
 
 	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
 	obj := messages.NewLocalObject(100, proto.LangGo)
@@ -42,7 +39,7 @@ func TestDAGWithLocal(t *testing.T) {
 	})
 
 	ref := &proto.Flow{
-		ObjectID: obj.ID,
+		ObjectID: obj.GetID(),
 		Source: &proto.StoreRef{
 			ID:  "store",
 			PID: storePID,
@@ -68,10 +65,7 @@ func TestDAGWithLocal(t *testing.T) {
 func TestDAGWithRemote(t *testing.T) {
 	var nodes []Node
 	storeProps := store.New(nil, "store")
-	sys := actor.NewActorSystem(actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
-		logger := utils.Logger()
-		return logger.With("system", system.ID)
-	}))
+	sys := actor.NewActorSystem(utils.WithLogger())
 	storePID, _ := sys.Root.SpawnNamed(storeProps, "store")
 	obj := messages.NewLocalObject(100, proto.LangGo)
 	sys.Root.Send(storePID, &store.SaveObject{
@@ -79,7 +73,7 @@ func TestDAGWithRemote(t *testing.T) {
 	})
 
 	ref := &proto.Flow{
-		ObjectID: obj.ID,
+		ObjectID: obj.GetID(),
 		Source: &proto.StoreRef{
 			ID:  "store",
 			PID: storePID,

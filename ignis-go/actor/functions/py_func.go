@@ -16,8 +16,6 @@ type PyFunction struct {
 	language proto.Language
 }
 
-var _ Function = (*PyFunction)(nil)
-
 func NewPy(
 	manager *python.VenvManager,
 	name string,

@@ -101,11 +101,11 @@ func NewLocalStreamWithID(id string, values any, language proto.Language) *Local
 	}
 
 	go func() {
+		defer s.EnqueueChunk(nil)
 		ch := reflect.ValueOf(values)
 		for {
 			v, ok := ch.Recv()
 			if !ok {
-				s.EnqueueChunk(nil)
 				return
 			}
 

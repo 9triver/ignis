@@ -16,6 +16,11 @@ type Function interface {
 	Language() proto.Language
 }
 
+var (
+	_ Function = (*GoFunction[any, any])(nil)
+	_ Function = (*PyFunction)(nil)
+)
+
 type FuncDec struct {
 	name   string
 	params []string
