@@ -5,15 +5,16 @@ import (
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
-	"github.com/asynkron/protoactor-go/remote"
+	ar "github.com/asynkron/protoactor-go/remote"
 
+	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 )
 
 func TestSingleStore(t *testing.T) {
 	sys := actor.NewActorSystem()
-	stub := NewActorStub(sys)
+	stub := remote.NewActorStub(sys)
 	props := New(stub, "store")
 
 	store := sys.Root.Spawn(props)
@@ -22,7 +23,7 @@ func TestSingleStore(t *testing.T) {
 	ctx := sys.Root
 	listen := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
-		case *ObjectResponse:
+		case *messages.ObjectResponse:
 			obj := msg.Value
 			if stream, ok := obj.(*messages.LocalStream); ok {
 				for i := range stream.ToChan() {
@@ -34,11 +35,11 @@ func TestSingleStore(t *testing.T) {
 		}
 	}))
 
-	ctx.Send(store, &SaveObject{
+	ctx.Send(store, &messages.SaveObject{
 		Value: messages.NewLocalObjectWithID("obj-1", 10, proto.LangJson),
 	})
 
-	ctx.Send(store, &RequestObject{
+	ctx.Send(store, &messages.RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "obj-1",
@@ -56,12 +57,12 @@ func TestSingleStore(t *testing.T) {
 			ints <- i
 		}
 	}()
-	ctx.Send(store, &SaveObject{
+	ctx.Send(store, &messages.SaveObject{
 		Value:    messages.NewLocalStreamWithID("stream-1", ints, proto.LangJson),
 		Callback: nil,
 	})
 
-	ctx.Send(store, &RequestObject{
+	ctx.Send(store, &messages.RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "stream-1",
@@ -78,16 +79,16 @@ func TestSingleStore(t *testing.T) {
 func TestMultipleStores(t *testing.T) {
 	sys1 := actor.NewActorSystem()
 	ctx1 := sys1.Root
-	remote1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
+	remote1 := ar.NewRemote(sys1, ar.Configure("127.0.0.1", 3000))
 	remote1.Start()
 
 	sys2 := actor.NewActorSystem()
 	ctx2 := sys2.Root
-	remote2 := remote.NewRemote(sys2, remote.Configure("127.0.0.1", 3001))
+	remote2 := ar.NewRemote(sys2, ar.Configure("127.0.0.1", 3001))
 	remote2.Start()
 
-	stub1 := NewActorStub(sys1)
-	stub2 := NewActorStub(sys2)
+	stub1 := remote.NewActorStub(sys1)
+	stub2 := remote.NewActorStub(sys2)
 
 	store1 := sys1.Root.Spawn(New(stub1, "store1"))
 	defer sys1.Root.Stop(store1)
@@ -95,7 +96,7 @@ func TestMultipleStores(t *testing.T) {
 	store2 := sys2.Root.Spawn(New(stub2, "store2"))
 	defer sys2.Root.Stop(store2)
 
-	ctx1.Send(store1, &SaveObject{
+	ctx1.Send(store1, &messages.SaveObject{
 		Value: messages.NewLocalObjectWithID("obj-1", 10, proto.LangJson),
 	})
 
@@ -106,14 +107,14 @@ func TestMultipleStores(t *testing.T) {
 			ints <- i
 		}
 	}()
-	ctx1.Send(store1, &SaveObject{
+	ctx1.Send(store1, &messages.SaveObject{
 		Value:    messages.NewLocalStreamWithID("stream-1", ints, proto.LangJson),
 		Callback: nil,
 	})
 
 	listen := ctx2.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
-		case *ObjectResponse:
+		case *messages.ObjectResponse:
 			obj := msg.Value
 			if stream, ok := obj.(*messages.LocalStream); ok {
 				for i := range stream.ToChan() {
@@ -125,7 +126,7 @@ func TestMultipleStores(t *testing.T) {
 		}
 	}))
 
-	ctx2.Send(store2, &RequestObject{
+	ctx2.Send(store2, &messages.RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "obj-1",
@@ -136,7 +137,7 @@ func TestMultipleStores(t *testing.T) {
 		},
 	})
 
-	ctx2.Send(store2, &RequestObject{
+	ctx2.Send(store2, &messages.RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "stream-1",

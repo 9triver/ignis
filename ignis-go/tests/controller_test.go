@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/9triver/ignis/actor/functions/python"
+	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/actor/remote/rpc"
@@ -35,7 +35,7 @@ func TestController(t *testing.T) {
 	}()
 	<-time.After(1 * time.Second)
 
-	venvs, err := python.NewManager(ctx, em)
+	venvs, err := functions.NewVenvManager(ctx, em)
 	if err != nil {
 		panic(err)
 	}

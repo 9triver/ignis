@@ -1,4 +1,4 @@
-package python
+package functions
 
 import (
 	"context"
@@ -128,7 +128,7 @@ func (m *VenvManager) Close() error {
 	return m.save()
 }
 
-func NewManager(ctx context.Context, manager remote.ExecutorManager) (*VenvManager, error) {
+func NewVenvManager(ctx context.Context, manager remote.ExecutorManager) (*VenvManager, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	m := &VenvManager{
 		ctx:        ctx,

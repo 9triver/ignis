@@ -3,7 +3,6 @@ package functions
 import (
 	"strings"
 
-	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
@@ -12,12 +11,12 @@ import (
 
 type PyFunction struct {
 	FuncDec
-	venv     *python.VirtualEnv
+	venv     *VirtualEnv
 	language proto.Language
 }
 
 func NewPy(
-	manager *python.VenvManager,
+	manager *VenvManager,
 	name string,
 	params []string,
 	venv string,
@@ -30,7 +29,7 @@ func NewPy(
 }
 
 func ImplPy(
-	manager *python.VenvManager,
+	manager *VenvManager,
 	dec FuncDec,
 	venv string,
 	packages []string,

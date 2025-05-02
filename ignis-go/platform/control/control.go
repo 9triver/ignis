@@ -7,7 +7,6 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/platform/task"
@@ -17,7 +16,7 @@ import (
 )
 
 type Controller struct {
-	manager    *python.VenvManager
+	manager    *functions.VenvManager
 	controller remote.Controller
 	store      *proto.StoreRef
 	nodes      map[string]*task.Node
@@ -163,7 +162,7 @@ func (c *Controller) Receive(ctx actor.Context) {
 func SpawnTaskController(
 	ctx *actor.RootContext,
 	store *proto.StoreRef,
-	venvs *python.VenvManager,
+	venvs *functions.VenvManager,
 	cm remote.ControllerManager,
 	onClose func(),
 ) *proto.ActorRef {

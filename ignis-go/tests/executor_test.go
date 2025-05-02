@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/9triver/ignis/actor/functions/python"
+	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/messages"
@@ -23,12 +23,12 @@ func TestVenvExecutor(t *testing.T) {
 		}
 	}()
 
-	manager, err := python.NewManager(ctx, em)
+	manager, err := functions.NewVenvManager(ctx, em)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defer func(manager *python.VenvManager) { _ = manager.Close() }(manager)
+	defer func(manager *functions.VenvManager) { _ = manager.Close() }(manager)
 
 	env, err := manager.GetVenv("test2")
 	if err != nil {
@@ -53,7 +53,7 @@ func TestVenvExecutor(t *testing.T) {
 	<-ctx.Done()
 }
 
-func testDirect(t *testing.T, env *python.VirtualEnv) {
+func testDirect(t *testing.T, env *functions.VirtualEnv) {
 	params := make(map[string]messages.Object)
 	params["a"] = messages.NewLocalObject(10, proto.LangJson)
 	params["b"] = messages.NewLocalObject(2, proto.LangJson)
@@ -62,7 +62,7 @@ func testDirect(t *testing.T, env *python.VirtualEnv) {
 	t.Log(ret, err)
 }
 
-func testJoin(t *testing.T, env *python.VirtualEnv) {
+func testJoin(t *testing.T, env *functions.VirtualEnv) {
 	ints := make(chan int)
 	go func() {
 		defer close(ints)
@@ -77,7 +77,7 @@ func testJoin(t *testing.T, env *python.VirtualEnv) {
 	t.Log(ret, err)
 }
 
-func testStream(t *testing.T, env *python.VirtualEnv) {
+func testStream(t *testing.T, env *functions.VirtualEnv) {
 	params := make(map[string]messages.Object)
 	params["n"] = messages.NewLocalObject(10, proto.LangJson)
 	fut := env.Execute("__gen", "call", params)
@@ -89,7 +89,7 @@ func testStream(t *testing.T, env *python.VirtualEnv) {
 	}
 }
 
-func testMap(t *testing.T, env *python.VirtualEnv) {
+func testMap(t *testing.T, env *functions.VirtualEnv) {
 	ints := make(chan int)
 	go func() {
 		defer close(ints)

@@ -2,7 +2,6 @@ package actor_test
 
 import (
 	"context"
-
 	"path"
 	"testing"
 	"time"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/actor/remote/rpc"
@@ -106,7 +104,7 @@ func TestRemoteTask(t *testing.T) {
 	<-time.After(1 * time.Second)
 	go rpcClient(storeRef.PID, computePID)
 
-	venvs, err := python.NewManager(context.TODO(), em)
+	venvs, err := functions.NewVenvManager(context.TODO(), em)
 	if err != nil {
 		panic(err)
 	}
