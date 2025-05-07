@@ -45,16 +45,13 @@ func (g *ActorGroup) Push(info *ActorInfo) {
 	g.cond.Broadcast()
 }
 
-func (g *ActorGroup) TaskDone(info *ActorInfo, latency int64) {
-	if latency != 0 {
-		info.Latency = (latency + info.Latency) / 2
-	}
+func (g *ActorGroup) TaskDone(info *ActorInfo) {
 	g.Push(info)
 }
 
 func NewGroup(name string, candidates ...*ActorInfo) *ActorGroup {
 	pq := utils.MakePriorityQueue(func(i, j *ActorInfo) bool {
-		return i.Latency < j.Latency
+		return i.LinkLatency*2+i.CalcLatency < j.LinkLatency*2+j.CalcLatency
 	})
 	for _, info := range candidates {
 		pq.Push(info)

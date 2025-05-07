@@ -1,6 +1,8 @@
 package compute
 
 import (
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/functions"
@@ -50,7 +52,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 		a.sessions[invoke.SessionID] = session
 	}
 
-	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj messages.Object, err error) {
+	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj messages.Object, duration time.Duration, err error) {
 		if err != nil {
 			ctx.Logger().Error("compute: object fetch failed",
 				"actor", a.name,
@@ -60,7 +62,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 			ctx.Stop(session)
 			return
 		}
-		ctx.Send(session, &SessionInvoke{Param: invoke.Param, Value: obj})
+		ctx.Send(session, &SessionInvoke{Link: duration, Param: invoke.Param, Value: obj})
 	})
 }
 

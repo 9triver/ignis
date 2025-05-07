@@ -17,10 +17,12 @@ type Session struct {
 	params   map[string]messages.Object
 	start    *SessionStart
 	deps     utils.Set[string]
+	link     time.Duration
 }
 
 type SessionInvoke struct {
 	Param string
+	Link  time.Duration
 	Value messages.Object
 }
 
@@ -33,7 +35,7 @@ func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
 	ctx.Logger().Info("session: receive invoke", "session", s.id, "param", invoke.Param)
 	s.params[invoke.Param] = invoke.Value
 	s.deps.Remove(invoke.Param)
-
+	s.link += invoke.Link
 	if s.deps.Empty() && s.start != nil {
 		s.doInvoke(ctx)
 	}
@@ -64,13 +66,16 @@ func (s *Session) doInvoke(ctx actor.Context) {
 				return
 			}
 
+			info := s.start.Info
+			info.CalcLatency = (info.CalcLatency + int64(duration)) / 2
+			info.LinkLatency = (info.LinkLatency + int64(s.link)) / 2
+
 			save := &messages.SaveObject{
 				Value: obj,
 				Callback: func(ctx actor.Context, ref *proto.Flow) {
 					ctx.Send(s.store, &proto.InvokeRemote{
-						Target:   s.start.ReplyTo,
-						Info:     s.start.Info,
-						Duration: int64(duration),
+						Target: s.start.ReplyTo,
+						Info:   info,
 						Invoke: &proto.Invoke{
 							SessionID: s.id,
 							Value:     ref,

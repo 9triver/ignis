@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type FutureDoneCallback[T any] func(future T, err error)
+type FutureDoneCallback[T any] func(future T, duration time.Duration, err error)
 
 type Future[T any] interface {
 	Result() (T, error)
@@ -22,19 +22,22 @@ func NewFuture[T any](timeout time.Duration, callbacks ...FutureDoneCallback[T])
 var ErrFutureTimeout = errors.New("future: timeout")
 
 type ctxFutureImpl[T any] struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	done    bool
-	value   T
-	err     error
-	onDones []FutureDoneCallback[T]
+	ctx    context.Context
+	cancel context.CancelFunc
+	done   bool
+	value  T
+	err    error
+	tic    time.Time
+
+	duration time.Duration
+	onDones  []FutureDoneCallback[T]
 }
 
 func (f *ctxFutureImpl[T]) onDone() {
 	f.done = true
 	f.cancel()
 	for _, callback := range f.onDones {
-		callback(f.value, f.err)
+		callback(f.value, f.duration, f.err)
 	}
 }
 
@@ -51,6 +54,7 @@ func (f *ctxFutureImpl[T]) Resolve(value T) {
 	case <-f.ctx.Done():
 	default:
 		f.value = value
+		f.duration = time.Since(f.tic)
 		f.onDone()
 	}
 }
@@ -66,7 +70,7 @@ func (f *ctxFutureImpl[T]) Reject(err error) {
 
 func (f *ctxFutureImpl[T]) OnDone(callback FutureDoneCallback[T]) {
 	if f.done {
-		callback(f.value, f.err)
+		callback(f.value, f.duration, f.err)
 		return
 	}
 	f.onDones = append(f.onDones, callback)
@@ -78,5 +82,6 @@ func newCtxFuture[T any](timeout time.Duration, callbacks ...FutureDoneCallback[
 		ctx:     ctx,
 		cancel:  cancel,
 		onDones: callbacks,
+		tic:     time.Now(),
 	}
 }

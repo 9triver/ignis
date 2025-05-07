@@ -1,6 +1,8 @@
 package store
 
 import (
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/remote"
@@ -157,7 +159,7 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *messages.RequestObject) {
 			Error: err,
 		})
 	} else {
-		s.requestRemoteObject(req.Flow).OnDone(func(obj messages.Object, err error) {
+		s.requestRemoteObject(req.Flow).OnDone(func(obj messages.Object, duration time.Duration, err error) {
 			ctx.Send(req.ReplyTo, &messages.ObjectResponse{
 				Value: obj,
 				Error: err,
@@ -211,7 +213,7 @@ func New(stub remote.Stub, id string) *actor.Props {
 	}))
 }
 
-func Spawn(ctx actor.SpawnerContext, stub remote.Stub, id string) *proto.StoreRef {
+func Spawn(ctx *actor.RootContext, stub remote.Stub, id string) *proto.StoreRef {
 	s := &Actor{
 		id:            id,
 		stub:          stub,

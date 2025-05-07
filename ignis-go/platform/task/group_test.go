@@ -15,7 +15,7 @@ func TestGroup(t *testing.T) {
 			if i > 5 {
 				<-time.After(time.Duration(rand.IntN(3)) * time.Second)
 			}
-			g.Push(&ActorInfo{Latency: rand.Int64N(10) * int64(time.Second)})
+			g.Push(&ActorInfo{LinkLatency: rand.Int64N(10) * int64(time.Second)})
 			t.Log("Current: ", g.pq.String())
 		}
 	}()

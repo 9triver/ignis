@@ -25,7 +25,8 @@ message ActorRef {
 
 message ActorInfo {
   ActorRef Ref = 1;
-  int64 Latency = 2;
+  int64 CalcLatency = 2;
+  int64 LinkLatency = 3;
 }
 
 // Flow is reference to real object or stream
@@ -67,7 +68,6 @@ message InvokeRemote {
   ActorRef Target = 1;
   Invoke Invoke = 2;
   ActorInfo Info = 3;
-  int64 Duration = 4;
 }
 
 message StartRemote {

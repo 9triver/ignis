@@ -3,7 +3,6 @@ package control
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 
@@ -175,11 +174,10 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeRemote) {
 		"name", name,
 		"session", sessionId,
 		"instance", instanceId,
-		"time", time.Duration(ir.Duration),
 	)
 
 	if group, ok := c.groups[name]; ok {
-		group.TaskDone(ir.Info, ir.Duration)
+		group.TaskDone(ir.Info)
 	}
 
 	var msg *controller.Message
