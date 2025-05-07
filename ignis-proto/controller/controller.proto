@@ -2,7 +2,6 @@ syntax = "proto3";
 package controller;
 option go_package = "github.com/9triver/ignis/proto/controller";
 
-import "actor.proto";
 import "platform.proto";
 
 enum CommandType {
@@ -45,7 +44,7 @@ message AppendData {
 message AppendActor {
   string Name = 1; // actor name
   repeated string Params = 2; // function params
-  actor.PID PID = 3; // PID of actor
+  proto.ActorRef Ref = 3; // Ref to actor
 }
 
 message AppendPyFunc {

@@ -23,6 +23,11 @@ message ActorRef {
   actor.PID PID = 3;
 }
 
+message ActorInfo {
+  ActorRef Ref = 1;
+  int64 Latency = 2;
+}
+
 // Flow is reference to real object or stream
 message Flow {
   string ObjectID = 1; // ID of referenced object or stream
@@ -45,8 +50,6 @@ message StreamChunk {
   string Error = 4;
 }
 
-message InvokeEmpty {}
-
 // Invoke is sent to a dag node for workflow execution.
 message Invoke {
   string SessionID = 1;
@@ -63,4 +66,11 @@ message InvokeStart {
 message InvokeRemote {
   ActorRef Target = 1;
   Invoke Invoke = 2;
+  ActorInfo Info = 3;
+  int64 Duration = 4;
+}
+
+message StartRemote {
+  ActorInfo Info = 1;
+  InvokeStart Start = 2;
 }
