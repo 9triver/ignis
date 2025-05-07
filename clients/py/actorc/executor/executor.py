@@ -83,7 +83,8 @@ class Executor:
             self.send_q.put(msg)
 
         try:
-            print(cmd.Args, file=sys.stderr)
+            # print(cmd.Args, file=sys.stderr)
+            print({k: v.ID for k, v in cmd.Args.items()}, file=sys.stderr)
             args = {k: EncDec.decode(v) for k, v in cmd.Args.items()}
             func = self.registries[cmd.Name]
             value = func.call(**args)

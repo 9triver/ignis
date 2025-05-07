@@ -29,7 +29,10 @@ class ActorContext:
 
     def __init__(self, master_address: str = "localhost:50051"):
         self._master_address = master_address
-        self._channel = grpc.insecure_channel(master_address)
+        self._channel = grpc.insecure_channel(
+            master_address,
+            options=[("grpc.max_receive_message_length", 512 * 1024 * 1024)],
+        )
         self._stub = controller_pb2_grpc.ServiceStub(self._channel)
         self._q = queue.Queue()
         self._response_stream = self._stub.Session(self._generate())
@@ -103,6 +106,10 @@ class ActorFunction(Function):
         dependcy = self._config.dependency
         fn_name = self._config.name
         venv = self._config.venv
+        try:
+            replicas = self._config.replicas
+        except AttributeError:
+            replicas = 1
         sig = inspect.signature(fn)
         params = []
         for name, param in sig.parameters.items():
@@ -117,6 +124,7 @@ class ActorFunction(Function):
                 Requirements=dependcy,
                 PickledObject=cloudpickle.dumps(self._fn),
                 Language=platform_pb2.LANG_PYTHON,
+                Replicas=replicas,
             ),
         )
         actorContext.send(message)
@@ -128,16 +136,16 @@ class ActorFunction(Function):
 class ActorExecutor(Executor):
     def __init__(self, dag):
         super().__init__(dag)
-        self._sesstionID = str(uuid.uuid4())
 
     def execute(self):
+        session_id = str(uuid.uuid4())
         while not self.dag.hasDone():
             task: list[DAGNode] = []
             for node in self.dag.get_nodes():
                 if node._done:
                     continue
                 if isinstance(node, DataNode):
-                    if node.is_ready():
+                    if node._ready:
                         task.append(node)
                 if isinstance(node, ControlNode):
                     if node.get_pre_data_nodes() == []:
@@ -161,7 +169,9 @@ class ActorExecutor(Executor):
                             else:
                                 rpc_data = controller_pb2.Data(
                                     Type=controller_pb2.Data.ObjectType.OBJ_ENCODED,
-                                    Encoded=EncDec.encode(data, language=platform_pb2.LANG_PYTHON),
+                                    Encoded=EncDec.encode(
+                                        data, language=platform_pb2.LANG_PYTHON
+                                    ),
                                 )
                             # if (
                             #     data_type == controller_pb2.Data.ObjectType.OBJ_ENCODED
@@ -179,7 +189,7 @@ class ActorExecutor(Executor):
                             #     rpc_data = controller_pb2.Data(Type=data_type, Ref=data)
 
                             appendArg = controller_pb2.AppendArg(
-                                SessionID=self._sesstionID,
+                                SessionID=session_id,
                                 InstanceID=control_node_metadata["id"],
                                 Name=control_node_metadata["functionname"],
                                 Param=params[node._ld.getid()],
@@ -194,7 +204,7 @@ class ActorExecutor(Executor):
                         log.info(f"{control_node.describe()} appargs {node._ld.value}")
                         if control_node.appargs(node._ld):
                             if control_node._fn_type == "remote":
-                                control_node._datas["sessionID"] = self._sesstionID
+                                control_node._datas["sessionID"] = session_id
                                 control_node._datas["instanceID"] = (
                                     control_node_metadata["id"]
                                 )
