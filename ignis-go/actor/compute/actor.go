@@ -24,13 +24,17 @@ func (a *Actor) newSession(ctx actor.Context, sessionId string) *actor.PID {
 	return session
 }
 
-func (a *Actor) onInvokeStart(ctx actor.Context, start *proto.InvokeStart) {
+func (a *Actor) onInvokeStart(ctx actor.Context, sr *proto.StartRemote) {
+	start := sr.Start
 	session, ok := a.sessions[start.SessionID]
 	if !ok {
 		session = a.newSession(ctx, start.SessionID)
 		a.sessions[start.SessionID] = session
 	}
-	ctx.Send(session, &SessionStart{ReplyTo: start.ReplyTo})
+	ctx.Send(session, &SessionStart{
+		Info:    sr.Info,
+		ReplyTo: start.ReplyTo,
+	})
 }
 
 func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
@@ -62,10 +66,12 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 
 func (a *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *proto.InvokeStart:
+	case *proto.StartRemote:
 		a.onInvokeStart(ctx, msg)
-	case *proto.Invoke:
-		a.onInvoke(ctx, msg)
+	case *proto.InvokeRemote:
+		a.onInvoke(ctx, msg.Invoke)
+	default:
+		ctx.Logger().Error("compute: unknown message", "message", msg)
 	}
 }
 

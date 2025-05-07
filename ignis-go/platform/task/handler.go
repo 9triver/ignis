@@ -9,7 +9,7 @@ import (
 
 type Handler interface {
 	Start(ctx actor.Context, replyTo *proto.ActorRef) error
-	Invoke(ctx actor.Context, param string, obj *proto.Flow) (ready bool, err error)
+	Invoke(ctx actor.Context, invoke *proto.Invoke) (ready bool, err error)
 }
 
 type baseHandler struct {
@@ -32,7 +32,7 @@ func (h *baseHandler) ready() bool {
 
 var (
 	_ Handler = (*LocalTaskHandler)(nil)
-	_ Handler = (*RemoteTaskHandler)(nil)
+	_ Handler = (*ActorTaskHandler)(nil)
 	_ Handler = (*GroupedTaskHandler)(nil)
 )
 

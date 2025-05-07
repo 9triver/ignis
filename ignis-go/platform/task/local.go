@@ -53,7 +53,8 @@ func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) err
 	return nil
 }
 
-func (h *LocalTaskHandler) Invoke(_ actor.Context, param string, obj *proto.Flow) (done bool, err error) {
+func (h *LocalTaskHandler) Invoke(_ actor.Context, invoke *proto.Invoke) (done bool, err error) {
+	param, obj := invoke.Param, invoke.Value
 	if !h.deps.Contains(param) {
 		return false, errors.Format("received unexpected param %s", param)
 	}
@@ -69,5 +70,44 @@ func HandlerFromFunction(sessionId string, store *actor.PID, f functions.Functio
 		baseHandler: makeBaseHandler(sessionId, store, f.Params()),
 		localFunc:   f,
 		params:      make(map[string]*proto.Flow),
+	}
+}
+
+func ProducerFromFunction(f functions.Function) HandlerProducer {
+	return func(sessionId string, store *actor.PID) Handler {
+		return HandlerFromFunction(sessionId, store, f)
+	}
+}
+
+type ActorTaskHandler struct {
+	baseHandler
+	pid *actor.PID
+}
+
+func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
+	ctx.Send(h.pid, &proto.InvokeStart{
+		SessionID: h.sessionId,
+		ReplyTo:   replyTo,
+	})
+	return nil
+}
+
+func (h *ActorTaskHandler) Invoke(ctx actor.Context, invoke *proto.Invoke) (bool, error) {
+	invoke.SessionID = h.sessionId
+	ctx.Send(h.pid, invoke)
+	h.deps.Remove(invoke.Param)
+	return h.ready(), nil
+}
+
+func HandlerFromPID(sessionId string, store *actor.PID, params []string, pid *actor.PID) *ActorTaskHandler {
+	return &ActorTaskHandler{
+		baseHandler: makeBaseHandler(sessionId, store, params),
+		pid:         pid,
+	}
+}
+
+func ProducerFromPID(params []string, pid *actor.PID) HandlerProducer {
+	return func(sessionId string, store *actor.PID) Handler {
+		return HandlerFromPID(sessionId, store, params, pid)
 	}
 }

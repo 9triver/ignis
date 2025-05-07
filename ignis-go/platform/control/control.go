@@ -3,9 +3,11 @@ package control
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 
+	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/messages"
@@ -19,8 +21,10 @@ type Controller struct {
 	manager    *functions.VenvManager
 	controller remote.Controller
 	store      *proto.StoreRef
-	nodes      map[string]*task.Node
-	runtimes   map[string]*actor.PID
+
+	nodes    map[string]*task.Node
+	groups   map[string]*task.ActorGroup
+	runtimes map[string]*actor.PID
 }
 
 func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
@@ -28,9 +32,20 @@ func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor)
 		"name", a.Name,
 		"params", a.Params,
 	)
-	node := task.NewNode(a.Name, a.Params, func(sessionId string, store *actor.PID) task.Handler {
-		return task.HandlerFromPID(sessionId, store, a.Params, a.PID)
-	})
+
+	info := &task.ActorInfo{
+		Ref: a.Ref,
+	}
+	if group, ok := c.groups[a.Name]; ok {
+		group.Push(info)
+		return
+	}
+
+	group := task.NewGroup(a.Name, info)
+	c.groups[a.Name] = group
+	go group.Run()
+
+	node := task.NodeFromActorGroup(a.Name, a.Params, group)
 	c.nodes[a.Name] = node
 }
 
@@ -39,13 +54,34 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 		"name", f.Name,
 		"params", f.Params,
 	)
+
 	pyFunc, err := functions.NewPy(c.manager, f.Name, f.Params, f.Venv, f.Requirements, f.PickledObject, f.Language)
 	if err != nil {
 		panic(err)
 	}
-	node := task.NewNode(f.Name, pyFunc.Params(), func(sessionId string, store *actor.PID) task.Handler {
-		return task.HandlerFromFunction(sessionId, store, pyFunc)
-	})
+
+	if f.Replicas == 0 {
+		f.Replicas = 1
+	}
+	group := task.NewGroup(f.Name)
+	c.groups[f.Name] = group
+	go group.Run()
+
+	for i := range f.Replicas {
+		name := fmt.Sprintf("%s-%d", f.Name, i)
+		props := compute.NewActor(name, pyFunc, c.store.PID)
+		pid := ctx.Spawn(props)
+		info := &proto.ActorInfo{
+			Ref: &proto.ActorRef{
+				ID:    name,
+				PID:   pid,
+				Store: c.store,
+			},
+		}
+		group.Push(info)
+	}
+
+	node := task.NodeFromActorGroup(f.Name, f.Params, group)
 	c.nodes[f.Name] = node
 }
 
@@ -139,7 +175,12 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeRemote) {
 		"name", name,
 		"session", sessionId,
 		"instance", instanceId,
+		"time", time.Duration(ir.Duration),
 	)
+
+	if group, ok := c.groups[name]; ok {
+		group.TaskDone(ir.Info, ir.Duration)
+	}
 
 	var msg *controller.Message
 	if ret.Error != "" {
@@ -173,9 +214,11 @@ func SpawnTaskController(
 			controller: c,
 			store:      store,
 			nodes:      make(map[string]*task.Node),
+			groups:     make(map[string]*task.ActorGroup),
 			runtimes:   make(map[string]*actor.PID),
 		}
 	})
+
 	pid, _ := ctx.SpawnNamed(props, "controller")
 	go func() {
 		defer onClose()

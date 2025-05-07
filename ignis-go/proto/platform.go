@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -78,9 +79,21 @@ func (ref *StoreRef) Equals(other *StoreRef) bool {
 	return ref.ID == other.ID
 }
 
+func (ref *StoreRef) Addr() string {
+	return fmt.Sprintf("store.%s", ref.ID)
+}
+
 func (ref *ActorRef) Equals(other *ActorRef) bool {
 	if other == nil {
 		return false
 	}
 	return ref.ID == other.ID && ref.Store.Equals(other.Store)
+}
+
+func (ref *ActorRef) Addr() string {
+	return fmt.Sprintf("actor.%s@%s", ref.ID, ref.Store.Addr())
+}
+
+func (sr *StartRemote) GetTarget() *ActorRef {
+	return sr.Info.Ref
 }

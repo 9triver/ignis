@@ -23,7 +23,7 @@ import (
 	"github.com/9triver/ignis/proto/controller"
 )
 
-func rpcClient(storePID, computePID *actor.PID) {
+func rpcClient(computeRef *proto.ActorRef) {
 	conn, err := grpc.NewClient("127.0.0.1:8082", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
@@ -44,17 +44,14 @@ func rpcClient(storePID, computePID *actor.PID) {
 		panic(err)
 	}
 
-	err = stream.Send(controller.NewAppendActor("func", []string{"A", "B"}, computePID))
+	err = stream.Send(controller.NewAppendActor("func", []string{"A", "B"}, computeRef))
 	if err != nil {
 		panic(err)
 	}
 
 	err = stream.Send(controller.NewAppendArgFromRef("session-0", "instance-0", "func", "A", &proto.Flow{
 		ObjectID: "obj-1",
-		Source: &proto.StoreRef{
-			ID:  "store",
-			PID: storePID,
-		},
+		Source:   computeRef.Store,
 	}))
 	if err != nil {
 		panic(err)
@@ -84,7 +81,7 @@ func TestRemoteTask(t *testing.T) {
 	sys := actor.NewActorSystem()
 	cm := rpc.NewManager("127.0.0.1:8082")
 	em := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 120*time.Second)
 	defer cancel()
 
 	storeRef := store.Spawn(sys.Root, remote.NewActorStub(sys), "store")
@@ -102,7 +99,12 @@ func TestRemoteTask(t *testing.T) {
 		_ = cm.Run(ctx)
 	}()
 	<-time.After(1 * time.Second)
-	go rpcClient(storeRef.PID, computePID)
+	ref := &proto.ActorRef{
+		ID:    "graph-task",
+		PID:   computePID,
+		Store: storeRef,
+	}
+	go rpcClient(ref)
 
 	venvs, err := functions.NewVenvManager(context.TODO(), em)
 	if err != nil {

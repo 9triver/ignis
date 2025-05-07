@@ -55,6 +55,7 @@ message AppendPyFunc {
   bytes PickledObject = 5; // encoded function impl
   proto.Language Language = 6; // return type of function
   // TODO: Resources
+  int32 Replicas = 7;
 }
 
 message AppendArg {

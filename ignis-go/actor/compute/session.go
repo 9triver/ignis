@@ -15,7 +15,7 @@ type Session struct {
 	store    *actor.PID
 	executor *Executor
 	params   map[string]messages.Object
-	replyTo  *proto.ActorRef
+	start    *SessionStart
 	deps     utils.Set[string]
 }
 
@@ -25,6 +25,7 @@ type SessionInvoke struct {
 }
 
 type SessionStart struct {
+	Info    *proto.ActorInfo
 	ReplyTo *proto.ActorRef
 }
 
@@ -33,15 +34,15 @@ func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
 	s.params[invoke.Param] = invoke.Value
 	s.deps.Remove(invoke.Param)
 
-	if s.deps.Empty() && s.replyTo != nil {
+	if s.deps.Empty() && s.start != nil {
 		s.doInvoke(ctx)
 	}
 }
 
 func (s *Session) onStart(ctx actor.Context, start *SessionStart) {
 	ctx.Logger().Info("session: start execution", "session", s.id, "replyTo", start.ReplyTo.ID)
-	s.replyTo = start.ReplyTo
-	if s.deps.Empty() && s.replyTo != nil {
+	s.start = start
+	if s.deps.Empty() {
 		s.doInvoke(ctx)
 	}
 }
@@ -54,7 +55,7 @@ func (s *Session) doInvoke(ctx actor.Context) {
 		OnDone: func(obj messages.Object, err error, duration time.Duration) {
 			if err != nil {
 				ctx.Send(s.store, &proto.InvokeRemote{
-					Target: s.replyTo,
+					Target: s.start.ReplyTo,
 					Invoke: &proto.Invoke{
 						SessionID: s.id,
 						Error:     err.Error(),
@@ -67,7 +68,9 @@ func (s *Session) doInvoke(ctx actor.Context) {
 				Value: obj,
 				Callback: func(ctx actor.Context, ref *proto.Flow) {
 					ctx.Send(s.store, &proto.InvokeRemote{
-						Target: s.replyTo,
+						Target:   s.start.ReplyTo,
+						Info:     s.start.Info,
+						Duration: int64(duration),
 						Invoke: &proto.Invoke{
 							SessionID: s.id,
 							Value:     ref,
