@@ -33,10 +33,8 @@ class Streams:
         def generator(q):
             while True:
                 obj = q.get()
-                print(f"recv {obj} from {name}", file=sys.stderr)
                 cls.streams[name].task_done()
                 if obj is None:
-                    print(f"break {name}", file=sys.stderr)
                     break
 
                 yield obj
@@ -47,7 +45,6 @@ class Streams:
     def put(cls, name: str, obj: Any):
         if name not in cls.streams:
             return
-        print(f"put {obj} to {name}", file=sys.stderr)
         cls.streams[name].put(obj)
 
     @classmethod
@@ -69,7 +66,6 @@ class EncDec:
             return Streams.register(obj.ID)
 
         data = obj.Data
-        print(obj.Language, file=sys.stderr)
         match obj.Language:
             case platform.LANG_PYTHON:
                 return cloudpickle.loads(data)

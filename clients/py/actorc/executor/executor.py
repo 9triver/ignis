@@ -18,7 +18,7 @@ class RemoteFunction(NamedTuple):
     fn: Callable[..., Any]
 
     def call(self, *args, **kwargs):
-        return self.fn(kwargs)
+        return self.fn(**kwargs)
 
 
 class _DebugFuncs:
@@ -76,7 +76,7 @@ class Executor:
                 chunk = platform.StreamChunk(
                     StreamID=cmd.CorrID, Error=f"{ex.__class__.__name__}: {ex}"
                 )
-            print(f"sending stream chunk {chunk} of {chunk.StreamID}", file=sys.stderr)
+
             msg = executor.Message(
                 Conn=self.name, Type=executor.STREAM_CHUNK, StreamChunk=chunk
             )
@@ -136,7 +136,6 @@ class Executor:
                     self.send_q.put(None)
                     return
                 case executor.STREAM_CHUNK:
-                    print("receive chunk", file=sys.stderr)
                     self.on_stream_chunk(cmd.StreamChunk)
                 case _:
                     print("unknown command type, ignoring", file=sys.stderr)
