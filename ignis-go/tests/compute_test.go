@@ -12,9 +12,9 @@ import (
 
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/actor/remote/rpc"
+	"github.com/9triver/ignis/actor/remote/stub"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/messages"
@@ -84,7 +84,7 @@ func TestRemoteTask(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 120*time.Second)
 	defer cancel()
 
-	storeRef := store.Spawn(sys.Root, remote.NewActorStub(sys), "store")
+	storeRef := store.Spawn(sys.Root, stub.NewActorStub(sys), "store")
 	type Input struct {
 		A int
 		B int

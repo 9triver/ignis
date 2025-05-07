@@ -7,15 +7,15 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	ar "github.com/asynkron/protoactor-go/remote"
 
-	"github.com/9triver/ignis/actor/remote"
+	"github.com/9triver/ignis/actor/remote/stub"
 	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/proto"
 )
 
 func TestSingleStore(t *testing.T) {
 	sys := actor.NewActorSystem()
-	stub := remote.NewActorStub(sys)
-	props := New(stub, "store")
+	s := stub.NewActorStub(sys)
+	props := New(s, "store")
 
 	store := sys.Root.Spawn(props)
 	defer sys.Root.Stop(store)
@@ -87,8 +87,8 @@ func TestMultipleStores(t *testing.T) {
 	remote2 := ar.NewRemote(sys2, ar.Configure("127.0.0.1", 3001))
 	remote2.Start()
 
-	stub1 := remote.NewActorStub(sys1)
-	stub2 := remote.NewActorStub(sys2)
+	stub1 := stub.NewActorStub(sys1)
+	stub2 := stub.NewActorStub(sys2)
 
 	store1 := sys1.Root.Spawn(New(stub1, "store1"))
 	defer sys1.Root.Stop(store1)
