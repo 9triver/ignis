@@ -26,15 +26,14 @@ func (a *Actor) newSession(ctx actor.Context, sessionId string) *actor.PID {
 	return session
 }
 
-func (a *Actor) onInvokeStart(ctx actor.Context, sr *proto.StartRemote) {
-	start := sr.Start
+func (a *Actor) onInvokeStart(ctx actor.Context, start *proto.InvokeStart) {
 	session, ok := a.sessions[start.SessionID]
 	if !ok {
 		session = a.newSession(ctx, start.SessionID)
 		a.sessions[start.SessionID] = session
 	}
 	ctx.Send(session, &SessionStart{
-		Info:    sr.Info,
+		Info:    start.Info,
 		ReplyTo: start.ReplyTo,
 	})
 }
@@ -44,7 +43,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 		"actor", a.name,
 		"session", invoke.SessionID,
 		"param", invoke.Param,
-		"value", invoke.Value.ObjectID,
+		"value", invoke.Value.ID,
 	)
 	session, ok := a.sessions[invoke.SessionID]
 	if !ok {
@@ -57,7 +56,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 			ctx.Logger().Error("compute: object fetch failed",
 				"actor", a.name,
 				"session", invoke.SessionID,
-				"object-id", obj.GetID(),
+				"object", obj.GetID(),
 			)
 			ctx.Stop(session)
 			return
@@ -68,12 +67,10 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 
 func (a *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *proto.StartRemote:
+	case *proto.InvokeStart:
 		a.onInvokeStart(ctx, msg)
-	case *proto.InvokeRemote:
-		a.onInvoke(ctx, msg.Invoke)
-	default:
-		ctx.Logger().Error("compute: unknown message", "message", msg)
+	case *proto.Invoke:
+		a.onInvoke(ctx, msg)
 	}
 }
 

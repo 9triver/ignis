@@ -8,10 +8,9 @@ import (
 
 func TestGroup(t *testing.T) {
 	g := NewGroup("test")
-	go g.Run()
 
 	go func() {
-		for i := range 15 {
+		for i := range 12 {
 			if i > 8 {
 				<-time.After(time.Duration(rand.IntN(3000)) * time.Millisecond)
 			}
@@ -22,9 +21,8 @@ func TestGroup(t *testing.T) {
 		}
 	}()
 
-	for range 15 {
-		t.Log("Current: ", g.pq.String())
-		selected := <-g.SelectChan()
+	for range 12 {
+		selected := g.Select()
 		t.Log("Select: ", selected)
 		<-time.After(time.Duration(rand.IntN(1000)) * time.Millisecond)
 	}

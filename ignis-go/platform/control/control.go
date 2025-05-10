@@ -2,7 +2,6 @@ package control
 
 import (
 	"fmt"
-	"github.com/9triver/ignis/actor/store"
 	"strings"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -10,6 +9,7 @@ import (
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote"
+	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -42,7 +42,6 @@ func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor)
 
 	group := task.NewGroup(a.Name, info)
 	c.groups[a.Name] = group
-	go group.Run()
 
 	node := task.NodeFromActorGroup(a.Name, a.Params, group)
 	c.nodes[a.Name] = node
@@ -64,7 +63,6 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 	}
 	group := task.NewGroup(f.Name)
 	c.groups[f.Name] = group
-	go group.Run()
 
 	for i := range f.Replicas {
 		name := fmt.Sprintf("%s-%d", f.Name, i)
@@ -124,35 +122,29 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 
 	switch v := arg.Value.Object.(type) {
 	case *controller.Data_Ref:
-		invoke := &proto.Invoke{
-			SessionID: sessionId,
-			Param:     arg.Param,
-			Value:     v.Ref,
-		}
-		if err := rt.Invoke(ctx, invoke); err != nil {
+		if err := rt.Invoke(ctx, arg.Param, v.Ref); err != nil {
 			ctx.Logger().Error("control: invoke error",
 				"name", arg.Name,
 				"param", arg.Param,
 				"session", arg.SessionID,
 				"instance", arg.InstanceID,
 			)
+			msg := controller.NewReturnResult(arg.SessionID, arg.InstanceID, arg.Name, nil, err)
+			c.controller.SendChan() <- msg
 		}
 	case *controller.Data_Encoded:
 		save := &store.SaveObject{
 			Value: v.Encoded,
 			Callback: func(ctx actor.Context, ref *proto.Flow) {
-				invoke := &proto.Invoke{
-					SessionID: sessionId,
-					Param:     arg.Param,
-					Value:     ref,
-				}
-				if err := rt.Invoke(ctx, invoke); err != nil {
+				if err := rt.Invoke(ctx, arg.Param, ref); err != nil {
 					ctx.Logger().Error("control: invoke error",
 						"name", arg.Name,
 						"param", arg.Param,
 						"session", arg.SessionID,
 						"instance", arg.InstanceID,
 					)
+					msg := controller.NewReturnResult(arg.SessionID, arg.InstanceID, arg.Name, nil, err)
+					c.controller.SendChan() <- msg
 				}
 			},
 		}
@@ -173,10 +165,21 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 	}
 }
 
-func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeRemote) {
-	ret := ir.Invoke
-	splits := strings.SplitN(ret.SessionID, "::", 3)
+func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeResponse) {
+	splits := strings.SplitN(ir.SessionID, "::", 3)
 	name, sessionId, instanceId := splits[0], splits[1], splits[2]
+	if ir.Error != "" {
+		ctx.Logger().Info("control: execution failed",
+			"name", name,
+			"session", sessionId,
+			"instance", instanceId,
+			"err", ir.Error,
+		)
+		msg := controller.NewReturnResult(sessionId, instanceId, name, nil, errors.New(ir.Error))
+		c.controller.SendChan() <- msg
+		return
+	}
+
 	ctx.Logger().Info("control: execution done",
 		"name", name,
 		"session", sessionId,
@@ -187,12 +190,7 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeRemote) {
 		group.Push(ir.Info)
 	}
 
-	var msg *controller.Message
-	if ret.Error != "" {
-		msg = controller.NewReturnResult(sessionId, instanceId, name, nil, errors.New(ret.Error))
-	} else {
-		msg = controller.NewReturnResult(sessionId, instanceId, name, ret.Value, nil)
-	}
+	msg := controller.NewReturnResult(sessionId, instanceId, name, ir.Result, nil)
 	c.controller.SendChan() <- msg
 }
 
@@ -200,7 +198,7 @@ func (c *Controller) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *controller.Message:
 		c.onControllerMessage(ctx, msg)
-	case *proto.InvokeRemote:
+	case *proto.InvokeResponse:
 		c.onReturn(ctx, msg)
 	}
 }

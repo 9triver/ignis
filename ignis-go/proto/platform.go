@@ -83,6 +83,6 @@ func (ref *ActorRef) Addr() string {
 	return fmt.Sprintf("actor.%s@%s", ref.ID, ref.Store.Addr())
 }
 
-func (sr *StartRemote) GetTarget() *ActorRef {
+func (sr *InvokeStart) GetTarget() *ActorRef {
 	return sr.Info.Ref
 }

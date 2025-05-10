@@ -10,7 +10,7 @@ import (
 type Handler interface {
 	SessionID() string
 	Start(ctx actor.Context, replyTo *proto.ActorRef) error
-	Invoke(ctx actor.Context, invoke *proto.Invoke) (ready bool, err error)
+	Invoke(ctx actor.Context, param string, value *proto.Flow) (ready bool, err error)
 }
 
 type baseHandler struct {

@@ -2,7 +2,6 @@ package actor_test
 
 import (
 	"context"
-	"github.com/9triver/ignis/utils"
 	"path"
 	"testing"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
+	"github.com/9triver/ignis/utils"
 )
 
 func rpcClient(computeRef *proto.ActorRef) {
@@ -51,8 +51,8 @@ func rpcClient(computeRef *proto.ActorRef) {
 	}
 
 	err = stream.Send(controller.NewAppendArgFromRef("session-0", "instance-0", "func", "A", &proto.Flow{
-		ObjectID: "obj-1",
-		Source:   computeRef.Store,
+		ID:     "obj-1",
+		Source: computeRef.Store,
 	}))
 	if err != nil {
 		panic(err)

@@ -14,6 +14,7 @@ type ExecInput struct {
 	Context   actor.Context
 	SessionID string
 	Params    map[string]objects.Interface
+	Timed     bool
 	OnDone    func(obj objects.Interface, err error, duration time.Duration)
 }
 
@@ -28,9 +29,13 @@ func (e *Executor) Deps() []string {
 
 func (e *Executor) doStart() {
 	for req := range e.requests {
-		tic := time.Now()
-		obj, err := e.handler.Call(req.Params)
-		req.OnDone(obj, err, time.Since(tic))
+		if req.Timed {
+			duration, obj, err := e.handler.TimedCall(req.Params)
+			req.OnDone(obj, err, duration)
+		} else {
+			obj, err := e.handler.Call(req.Params)
+			req.OnDone(obj, err, 0)
+		}
 	}
 }
 

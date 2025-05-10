@@ -2,8 +2,6 @@ package utils
 
 import (
 	"container/heap"
-	"fmt"
-	"strings"
 )
 
 type Set[T comparable] map[T]struct{}
@@ -63,19 +61,6 @@ type heapImpl[T any] struct {
 	less LessFunc[T]
 }
 
-func (h *heapImpl[T]) String() string {
-	sb := strings.Builder{}
-	sb.WriteByte('[')
-	for i, v := range h.data {
-		sb.WriteString(fmt.Sprintf("%v", v))
-		if i != len(h.data)-1 {
-			sb.WriteByte(',')
-		}
-	}
-	sb.WriteByte(']')
-	return sb.String()
-}
-
 var _ heap.Interface = (*heapImpl[int])(nil)
 
 func (h *heapImpl[T]) Len() int {
@@ -118,10 +103,6 @@ func (pq PQueue[T]) Remove(i int) T {
 
 func (pq PQueue[T]) Len() int {
 	return pq.impl.Len()
-}
-
-func (pq PQueue[T]) String() string {
-	return pq.impl.String()
 }
 
 func MakePriorityQueue[T any](less LessFunc[T], elems ...T) PQueue[T] {

@@ -2,6 +2,7 @@ package functions
 
 import (
 	"strings"
+	"time"
 
 	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
@@ -65,6 +66,12 @@ func (f *PyFunction) Call(params map[string]objects.Interface) (objects.Interfac
 		return nil, errors.WrapWith(err, "%s: execution failed", f.name)
 	}
 	return result, nil
+}
+
+func (f *PyFunction) TimedCall(params map[string]objects.Interface) (time.Duration, objects.Interface, error) {
+	start := time.Now()
+	obj, err := f.Call(params)
+	return time.Since(start), obj, err
 }
 
 func (f *PyFunction) Language() proto.Language {

@@ -31,7 +31,7 @@ message ActorInfo {
 
 // Flow is reference to real object or stream
 message Flow {
-  string ObjectID = 1; // ID of referenced object or stream
+  string ID = 1; // ID of referenced object or stream
   StoreRef Source = 2; // points to store actor of a single worker.
 }
 
@@ -51,26 +51,28 @@ message StreamChunk {
   string Error = 4;
 }
 
-// Invoke is sent to a dag node for workflow execution.
+// Invoke is sent to compute actor, providing a value to its dependency.
 message Invoke {
-  string SessionID = 1;
-  string Param = 2;
-  Flow Value = 3;
-  string Error = 4;
+  ActorRef Target = 1; // target actor reference
+  string SessionID = 2; // id of current execution session
+  string Param = 3; // name of parameter
+  Flow Value = 4; // value of parameter
 }
 
+// InvokeStart is sent to compute actor before invoking.
+// InvokeStart can be sent to compute actor before Invoke, since it is intended to provide
+// reference to its successor and actor info for latency measurement.
 message InvokeStart {
-  string SessionID = 1;
-  ActorRef ReplyTo = 2;
+  ActorInfo Info = 1; // (optional) actor info for latency measurement, required when using actor group
+  string SessionID = 2; // id of current execution session
+  ActorRef ReplyTo = 3; // actor to reply to, usually points to calling controller actor
 }
 
-message InvokeRemote {
-  ActorRef Target = 1;
-  Invoke Invoke = 2;
-  ActorInfo Info = 3;
-}
-
-message StartRemote {
-  ActorInfo Info = 1;
-  InvokeStart Start = 2;
+// InvokeResponse is sent to controller actor after invoking.
+message InvokeResponse {
+  ActorRef Target = 1; // target actor reference
+  string SessionID = 2; // id of current execution session
+  Flow Result = 3; // result object reference of the invocation
+  string Error = 4; // (optional) error message
+  ActorInfo Info = 5; // (optional) actor info for latency measurement, required when using actor group
 }

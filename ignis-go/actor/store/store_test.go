@@ -42,7 +42,7 @@ func TestSingleStore(t *testing.T) {
 	ctx.Send(store, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
-			ObjectID: "obj-1",
+			ID: "obj-1",
 			Source: &proto.StoreRef{
 				ID:  "store",
 				PID: store,
@@ -65,7 +65,7 @@ func TestSingleStore(t *testing.T) {
 	ctx.Send(store, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
-			ObjectID: "stream-1",
+			ID: "stream-1",
 			Source: &proto.StoreRef{
 				ID:  "store",
 				PID: store,
@@ -129,7 +129,7 @@ func TestMultipleStores(t *testing.T) {
 	ctx2.Send(store2, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
-			ObjectID: "obj-1",
+			ID: "obj-1",
 			Source: &proto.StoreRef{
 				ID:  "store1",
 				PID: store1,
@@ -140,7 +140,7 @@ func TestMultipleStores(t *testing.T) {
 	ctx2.Send(store2, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
-			ObjectID: "stream-1",
+			ID: "stream-1",
 			Source: &proto.StoreRef{
 				ID:  "store1",
 				PID: store1,

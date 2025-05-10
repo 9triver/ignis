@@ -40,12 +40,10 @@ func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) err
 	ctx.Send(h.store, &store.SaveObject{
 		Value: obj,
 		Callback: func(ctx actor.Context, ref *proto.Flow) {
-			ctx.Send(h.store, &proto.InvokeRemote{
-				Target: replyTo,
-				Invoke: &proto.Invoke{
-					SessionID: h.sessionId,
-					Value:     ref,
-				},
+			ctx.Send(h.store, &proto.InvokeResponse{
+				Target:    replyTo,
+				SessionID: h.sessionId,
+				Result:    ref,
 			})
 		},
 	})
@@ -53,13 +51,12 @@ func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) err
 	return nil
 }
 
-func (h *LocalTaskHandler) Invoke(_ actor.Context, invoke *proto.Invoke) (done bool, err error) {
-	param, obj := invoke.Param, invoke.Value
+func (h *LocalTaskHandler) Invoke(_ actor.Context, param string, value *proto.Flow) (bool, error) {
 	if !h.deps.Contains(param) {
 		return false, errors.Format("received unexpected param %s", param)
 	}
 
-	h.params[param] = obj
+	h.params[param] = value
 	h.deps.Remove(param)
 
 	return h.ready(), nil
@@ -92,10 +89,13 @@ func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) err
 	return nil
 }
 
-func (h *ActorTaskHandler) Invoke(ctx actor.Context, invoke *proto.Invoke) (bool, error) {
-	invoke.SessionID = h.sessionId
-	ctx.Send(h.pid, invoke)
-	h.deps.Remove(invoke.Param)
+func (h *ActorTaskHandler) Invoke(ctx actor.Context, param string, value *proto.Flow) (bool, error) {
+	ctx.Send(h.pid, &proto.Invoke{
+		SessionID: h.sessionId,
+		Param:     param,
+		Value:     value,
+	})
+	h.deps.Remove(param)
 	return h.ready(), nil
 }
 

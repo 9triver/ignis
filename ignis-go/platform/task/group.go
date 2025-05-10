@@ -16,25 +16,17 @@ type ActorGroup struct {
 	name string
 	pq   utils.PQueue[*ActorInfo]
 	cond *sync.Cond
-	ch   chan *ActorInfo
 }
 
-func (g *ActorGroup) SelectChan() <-chan *ActorInfo {
-	return g.ch
-}
+func (g *ActorGroup) Select() *ActorInfo {
+	g.cond.L.Lock()
+	defer g.cond.L.Unlock()
 
-func (g *ActorGroup) Run() {
-	defer close(g.ch)
-	for {
-		g.cond.L.Lock()
-		for g.pq.Len() == 0 {
-			g.cond.Wait()
-		}
-		g.cond.L.Unlock()
-
-		selected := g.pq.Pop()
-		g.ch <- selected
+	for g.pq.Len() == 0 {
+		g.cond.Wait()
 	}
+
+	return g.pq.Pop()
 }
 
 func (g *ActorGroup) Push(info *ActorInfo) {
@@ -42,7 +34,7 @@ func (g *ActorGroup) Push(info *ActorInfo) {
 	g.pq.Push(info)
 	g.cond.L.Unlock()
 
-	g.cond.Broadcast()
+	g.cond.Signal()
 }
 
 func GroupWithLessFunc(name string, lessFunc utils.LessFunc[*ActorInfo], candidates ...*ActorInfo) *ActorGroup {
@@ -50,7 +42,6 @@ func GroupWithLessFunc(name string, lessFunc utils.LessFunc[*ActorInfo], candida
 		name: name,
 		pq:   utils.MakePriorityQueue(lessFunc, candidates...),
 		cond: sync.NewCond(&sync.Mutex{}),
-		ch:   make(chan *ActorInfo),
 	}
 }
 
@@ -71,25 +62,25 @@ func (h *GroupedTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) e
 		return errors.New("no candidate actor selected")
 	}
 
-	ctx.Send(h.store, &proto.StartRemote{
-		Info: h.selected,
-		Start: &proto.InvokeStart{
-			SessionID: h.sessionId,
-			ReplyTo:   replyTo,
-		},
+	ctx.Send(h.store, &proto.InvokeStart{
+		Info:      h.selected,
+		SessionID: h.sessionId,
+		ReplyTo:   replyTo,
 	})
 	return nil
 }
 
-func (h *GroupedTaskHandler) Invoke(ctx actor.Context, invoke *proto.Invoke) (ready bool, err error) {
+func (h *GroupedTaskHandler) Invoke(ctx actor.Context, param string, value *proto.Flow) (bool, error) {
 	if h.selected == nil {
-		h.selected = <-h.group.SelectChan()
+		h.selected = h.group.Select()
 	}
 
-	h.deps.Remove(invoke.Param)
-	ctx.Send(h.store, &proto.InvokeRemote{
-		Target: h.selected.Ref,
-		Invoke: invoke,
+	h.deps.Remove(param)
+	ctx.Send(h.store, &proto.Invoke{
+		Target:    h.selected.Ref,
+		SessionID: h.sessionId,
+		Param:     param,
+		Value:     value,
 	})
 	return h.ready(), nil
 }

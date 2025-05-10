@@ -2,6 +2,7 @@ package functions
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
@@ -49,6 +50,12 @@ func (h *GoFunction[I, O]) Call(params map[string]objects.Interface) (objects.In
 		obj = objects.NewLocal(o, h.language)
 	}
 	return obj, nil
+}
+
+func (h *GoFunction[I, O]) TimedCall(params map[string]objects.Interface) (time.Duration, objects.Interface, error) {
+	start := time.Now()
+	obj, err := h.Call(params)
+	return time.Since(start), obj, err
 }
 
 func (h *GoFunction[I, O]) Language() proto.Language {

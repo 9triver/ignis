@@ -50,41 +50,52 @@ func (s *Session) onStart(ctx actor.Context, start *SessionStart) {
 	}
 }
 
+func (s *Session) onError(ctx actor.Context, err error) {
+	ctx.Logger().Error("session: execution failed", "session", s.id, "err", err)
+
+	ctx.Send(s.store, &proto.InvokeResponse{
+		Target:    s.start.ReplyTo,
+		SessionID: s.id,
+		Info:      s.start.Info,
+		Error:     err.Error(),
+	})
+}
+
+func (s *Session) onComplete(ctx actor.Context, obj objects.Interface, duration time.Duration) {
+	ctx.Logger().Info("session: execution complete", "session", s.id, "duration", duration)
+
+	info := s.start.Info
+	if info != nil {
+		info.CalcLatency = (info.CalcLatency + int64(duration)) / 2
+		info.LinkLatency = (info.LinkLatency + int64(s.link)) / 2
+	}
+
+	save := &store.SaveObject{
+		Value: obj,
+		Callback: func(ctx actor.Context, ref *proto.Flow) {
+			ctx.Send(s.store, &proto.InvokeResponse{
+				Target:    s.start.ReplyTo,
+				SessionID: s.id,
+				Info:      info,
+				Result:    ref,
+			})
+		},
+	}
+	ctx.Send(s.store, save)
+}
+
 func (s *Session) doInvoke(ctx actor.Context) {
 	exec := &ExecInput{
 		Context:   ctx,
 		SessionID: s.id,
 		Params:    s.params,
+		Timed:     s.start.Info != nil,
 		OnDone: func(obj objects.Interface, err error, duration time.Duration) {
 			if err != nil {
-				ctx.Send(s.store, &proto.InvokeRemote{
-					Target: s.start.ReplyTo,
-					Invoke: &proto.Invoke{
-						SessionID: s.id,
-						Error:     err.Error(),
-					},
-				})
+				s.onError(ctx, err)
 				return
 			}
-
-			info := s.start.Info
-			info.CalcLatency = (info.CalcLatency + int64(duration)) / 2
-			info.LinkLatency = (info.LinkLatency + int64(s.link)) / 2
-
-			save := &store.SaveObject{
-				Value: obj,
-				Callback: func(ctx actor.Context, ref *proto.Flow) {
-					ctx.Send(s.store, &proto.InvokeRemote{
-						Target: s.start.ReplyTo,
-						Info:   info,
-						Invoke: &proto.Invoke{
-							SessionID: s.id,
-							Value:     ref,
-						},
-					})
-				},
-			}
-			ctx.Send(s.store, save)
+			s.onComplete(ctx, obj, duration)
 		},
 	}
 	s.executor.Requests() <- exec

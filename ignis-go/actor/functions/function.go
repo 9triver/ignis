@@ -2,6 +2,7 @@ package functions
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
@@ -13,6 +14,7 @@ type Function interface {
 	Name() string
 	Params() []string
 	Call(params map[string]objects.Interface) (objects.Interface, error)
+	TimedCall(params map[string]objects.Interface) (time.Duration, objects.Interface, error)
 	Language() proto.Language
 }
 

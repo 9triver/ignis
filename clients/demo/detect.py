@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from typing import Iterable
@@ -157,7 +158,7 @@ def inference(im: np.ndarray):
     name="paint",
     venv="test2",
 )
-def train(image, result):
+def paint(image: np.ndarray, result: dict):
     for box, label, score in zip(result["boxes"], result["labels"], result["scores"]):
         if score < 0.8:
             continue
@@ -173,6 +174,7 @@ def train(image, result):
             (0, 255, 0),
             2,
         )
+    cv2.imwrite(f"/home/iori/workspace/ignis/result.jpg", image)
     return image
 
 
@@ -219,12 +221,9 @@ def actorWorkflowExportFunc(dict: dict):
     return workflow.execute()
 
 
-workflow_func1 = workflowfunc.export(actorWorkflowExportFunc)
-workflow_func2 = workflowfunc.export(actorWorkflowExportFunc)
+detect = workflowfunc.export(actorWorkflowExportFunc)
 # print("----first execute----")
-workflow_func1(
-    {"path": "/home/iori/workspace/ignis/clients/demo/images/000000025394.jpg"}
-)
-workflow_func2(
-    {"path": "/home/iori/workspace/ignis/clients/demo/images/000000025394.jpg"}
-)
+img_dir = "/home/iori/workspace/ignis/clients/demo/images"
+for file in os.listdir(img_dir):
+    if file.endswith(".jpg"):
+        detect({"path": os.path.join(img_dir, file)})

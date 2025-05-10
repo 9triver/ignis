@@ -8,6 +8,7 @@ require (
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/zeromq/goczmq.v4 v4.1.0
+	github.com/lmittmann/tint v1.0.7
 )
 
 require (
@@ -20,7 +21,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/lmittmann/tint v1.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/orcaman/concurrent-map v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect

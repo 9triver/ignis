@@ -117,29 +117,29 @@ func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
 	s.localObjects[obj.GetID()] = obj
 
 	if save.Callback != nil {
-		save.Callback(ctx, &proto.Flow{ObjectID: obj.GetID(), Source: s.ref})
+		save.Callback(ctx, &proto.Flow{ID: obj.GetID(), Source: s.ref})
 	}
 }
 
 func (s *Actor) getLocalObject(flow *proto.Flow) (objects.Interface, error) {
-	obj, ok := s.localObjects[flow.ObjectID]
+	obj, ok := s.localObjects[flow.ID]
 	if !ok {
-		return nil, errors.Format("store: flow %s not found", flow.ObjectID)
+		return nil, errors.Format("store: flow %s not found", flow.ID)
 	}
 	return obj, nil
 }
 
 func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[objects.Interface] {
-	if fut, ok := s.remoteObjects[flow.ObjectID]; ok {
+	if fut, ok := s.remoteObjects[flow.ID]; ok {
 		return fut
 	}
 
 	fut := utils.NewFuture[objects.Interface](configs.FlowTimeout)
-	s.remoteObjects[flow.ObjectID] = fut
+	s.remoteObjects[flow.ID] = fut
 
 	remoteRef := flow.Source
 	s.stub.SendTo(remoteRef, &cluster.ObjectRequest{
-		ID:      flow.ObjectID,
+		ID:      flow.ID,
 		ReplyTo: s.ref,
 	})
 	return fut
@@ -147,7 +147,7 @@ func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[objects.Inter
 
 func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 	ctx.Logger().Info("store: local flow request",
-		"id", req.Flow.ObjectID,
+		"id", req.Flow.ID,
 		"store", req.Flow.Source.ID,
 	)
 
@@ -244,12 +244,12 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 		switch msg := c.Message().(type) {
 		case *ObjectResponse:
 			if msg.Error != nil {
-				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ObjectID))
+				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ID))
 				return
 			}
 
-			if msg.Value.GetID() != flow.ObjectID {
-				err := errors.Format("flow %s received unexpected ID %s", flow.ObjectID, msg.Value.GetID())
+			if msg.Value.GetID() != flow.ID {
+				err := errors.Format("flow %s received unexpected ID %s", flow.ID, msg.Value.GetID())
 				fut.Reject(err)
 				return
 			}
