@@ -8,6 +8,7 @@ import (
 )
 
 type Handler interface {
+	SessionID() string
 	Start(ctx actor.Context, replyTo *proto.ActorRef) error
 	Invoke(ctx actor.Context, invoke *proto.Invoke) (ready bool, err error)
 }
@@ -28,6 +29,10 @@ func makeBaseHandler(sessionId string, store *actor.PID, inDegrees []string) bas
 
 func (h *baseHandler) ready() bool {
 	return h.deps.Empty()
+}
+
+func (h *baseHandler) SessionID() string {
+	return h.sessionId
 }
 
 var (

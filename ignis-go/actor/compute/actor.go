@@ -7,7 +7,7 @@ import (
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/store"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 )
 
@@ -52,7 +52,7 @@ func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {
 		a.sessions[invoke.SessionID] = session
 	}
 
-	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj messages.Object, duration time.Duration, err error) {
+	store.GetObject(ctx, a.store, invoke.Value).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
 		if err != nil {
 			ctx.Logger().Error("compute: object fetch failed",
 				"actor", a.name,

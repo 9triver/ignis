@@ -3,7 +3,7 @@ package functions
 import (
 	"reflect"
 
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 )
 
@@ -12,7 +12,7 @@ import (
 type Function interface {
 	Name() string
 	Params() []string
-	Call(params map[string]messages.Object) (messages.Object, error)
+	Call(params map[string]objects.Interface) (objects.Interface, error)
 	Language() proto.Language
 }
 

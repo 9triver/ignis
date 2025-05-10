@@ -3,7 +3,7 @@ package functions
 import (
 	"strings"
 
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils/errors"
@@ -52,7 +52,7 @@ func ImplPy(
 	}, nil
 }
 
-func (f *PyFunction) Call(params map[string]messages.Object) (messages.Object, error) {
+func (f *PyFunction) Call(params map[string]objects.Interface) (objects.Interface, error) {
 	segs := strings.Split(f.Name(), ".")
 	var obj, method string
 	if len(segs) >= 2 {

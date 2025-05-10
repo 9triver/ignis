@@ -11,17 +11,21 @@ func TestGroup(t *testing.T) {
 	go g.Run()
 
 	go func() {
-		for i := range 10 {
-			if i > 5 {
-				<-time.After(time.Duration(rand.IntN(3)) * time.Second)
+		for i := range 15 {
+			if i > 8 {
+				<-time.After(time.Duration(rand.IntN(3000)) * time.Millisecond)
 			}
-			g.Push(&ActorInfo{LinkLatency: rand.Int64N(10) * int64(time.Second)})
-			t.Log("Current: ", g.pq.String())
+			g.Push(&ActorInfo{
+				LinkLatency: rand.Int64N(2000),
+				CalcLatency: rand.Int64N(10000),
+			})
 		}
 	}()
 
-	for selected := range g.SelectChan() {
-		<-time.After(time.Duration(rand.IntN(3)) * time.Second)
+	for range 15 {
+		t.Log("Current: ", g.pq.String())
+		selected := <-g.SelectChan()
 		t.Log("Select: ", selected)
+		<-time.After(time.Duration(rand.IntN(1000)) * time.Millisecond)
 	}
 }

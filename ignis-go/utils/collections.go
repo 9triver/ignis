@@ -50,10 +50,6 @@ func (s Set[T]) Copy() Set[T] {
 	return MakeSetFromSlice(s.Values())
 }
 
-func MakeSet[T comparable]() Set[T] {
-	return make(Set[T])
-}
-
 func MakeSetFromSlice[T comparable](slice []T) Set[T] {
 	set := make(Set[T])
 	for _, value := range slice {
@@ -67,13 +63,13 @@ type heapImpl[T any] struct {
 	less LessFunc[T]
 }
 
-func (h heapImpl[T]) String() string {
+func (h *heapImpl[T]) String() string {
 	sb := strings.Builder{}
 	sb.WriteByte('[')
 	for i, v := range h.data {
 		sb.WriteString(fmt.Sprintf("%v", v))
 		if i != len(h.data)-1 {
-			sb.WriteByte(' ')
+			sb.WriteByte(',')
 		}
 	}
 	sb.WriteByte(']')
@@ -82,11 +78,11 @@ func (h heapImpl[T]) String() string {
 
 var _ heap.Interface = (*heapImpl[int])(nil)
 
-func (h heapImpl[T]) Len() int {
+func (h *heapImpl[T]) Len() int {
 	return len(h.data)
 }
 
-func (h heapImpl[T]) Less(i int, j int) bool {
+func (h *heapImpl[T]) Less(i int, j int) bool {
 	return h.less(h.data[i], h.data[j])
 }
 
@@ -100,7 +96,7 @@ func (h *heapImpl[T]) Push(x any) {
 	h.data = append(h.data, x.(T))
 }
 
-func (h heapImpl[T]) Swap(i int, j int) {
+func (h *heapImpl[T]) Swap(i int, j int) {
 	h.data[i], h.data[j] = h.data[j], h.data[i]
 }
 
@@ -128,9 +124,10 @@ func (pq PQueue[T]) String() string {
 	return pq.impl.String()
 }
 
-func MakePriorityQueue[T any](less LessFunc[T]) PQueue[T] {
+func MakePriorityQueue[T any](less LessFunc[T], elems ...T) PQueue[T] {
 	impl := &heapImpl[T]{
 		less: less,
+		data: elems,
 	}
 	heap.Init(impl)
 	return PQueue[T]{impl}

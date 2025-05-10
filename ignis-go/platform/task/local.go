@@ -5,7 +5,7 @@ import (
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/store"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
@@ -18,12 +18,12 @@ type LocalTaskHandler struct {
 }
 
 func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
-	futures := make(map[string]utils.Future[messages.Object])
+	futures := make(map[string]utils.Future[objects.Interface])
 	for param, flow := range h.params {
 		futures[param] = store.GetObject(ctx, h.store, flow)
 	}
 
-	invoke := make(map[string]messages.Object)
+	invoke := make(map[string]objects.Interface)
 	for param, fut := range futures {
 		obj, err := fut.Result()
 		if err != nil {
@@ -37,7 +37,7 @@ func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) err
 		return err
 	}
 
-	ctx.Send(h.store, &messages.SaveObject{
+	ctx.Send(h.store, &store.SaveObject{
 		Value: obj,
 		Callback: func(ctx actor.Context, ref *proto.Flow) {
 			ctx.Send(h.store, &proto.InvokeRemote{

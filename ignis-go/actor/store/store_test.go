@@ -8,7 +8,7 @@ import (
 	ar "github.com/asynkron/protoactor-go/remote"
 
 	"github.com/9triver/ignis/actor/remote/stub"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 )
 
@@ -23,9 +23,9 @@ func TestSingleStore(t *testing.T) {
 	ctx := sys.Root
 	listen := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
-		case *messages.ObjectResponse:
+		case *ObjectResponse:
 			obj := msg.Value
-			if stream, ok := obj.(*messages.LocalStream); ok {
+			if stream, ok := obj.(*objects.Stream); ok {
 				for i := range stream.ToChan() {
 					t.Logf("received %v", i)
 				}
@@ -35,11 +35,11 @@ func TestSingleStore(t *testing.T) {
 		}
 	}))
 
-	ctx.Send(store, &messages.SaveObject{
-		Value: messages.NewLocalObjectWithID("obj-1", 10, proto.LangJson),
+	ctx.Send(store, &SaveObject{
+		Value: objects.LocalWithID("obj-1", 10, objects.LangJson),
 	})
 
-	ctx.Send(store, &messages.RequestObject{
+	ctx.Send(store, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "obj-1",
@@ -57,12 +57,12 @@ func TestSingleStore(t *testing.T) {
 			ints <- i
 		}
 	}()
-	ctx.Send(store, &messages.SaveObject{
-		Value:    messages.NewLocalStreamWithID("stream-1", ints, proto.LangJson),
+	ctx.Send(store, &SaveObject{
+		Value:    objects.StreamWithID("stream-1", ints, objects.LangJson),
 		Callback: nil,
 	})
 
-	ctx.Send(store, &messages.RequestObject{
+	ctx.Send(store, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "stream-1",
@@ -96,8 +96,8 @@ func TestMultipleStores(t *testing.T) {
 	store2 := sys2.Root.Spawn(New(stub2, "store2"))
 	defer sys2.Root.Stop(store2)
 
-	ctx1.Send(store1, &messages.SaveObject{
-		Value: messages.NewLocalObjectWithID("obj-1", 10, proto.LangJson),
+	ctx1.Send(store1, &SaveObject{
+		Value: objects.LocalWithID("obj-1", 10, objects.LangJson),
 	})
 
 	ints := make(chan int)
@@ -107,16 +107,16 @@ func TestMultipleStores(t *testing.T) {
 			ints <- i
 		}
 	}()
-	ctx1.Send(store1, &messages.SaveObject{
-		Value:    messages.NewLocalStreamWithID("stream-1", ints, proto.LangJson),
+	ctx1.Send(store1, &SaveObject{
+		Value:    objects.StreamWithID("stream-1", ints, objects.LangJson),
 		Callback: nil,
 	})
 
 	listen := ctx2.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
-		case *messages.ObjectResponse:
+		case *ObjectResponse:
 			obj := msg.Value
-			if stream, ok := obj.(*messages.LocalStream); ok {
+			if stream, ok := obj.(*objects.Stream); ok {
 				for i := range stream.ToChan() {
 					t.Logf("received chunk %v", i)
 				}
@@ -126,7 +126,7 @@ func TestMultipleStores(t *testing.T) {
 		}
 	}))
 
-	ctx2.Send(store2, &messages.RequestObject{
+	ctx2.Send(store2, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "obj-1",
@@ -137,7 +137,7 @@ func TestMultipleStores(t *testing.T) {
 		},
 	})
 
-	ctx2.Send(store2, &messages.RequestObject{
+	ctx2.Send(store2, &RequestObject{
 		ReplyTo: listen,
 		Flow: &proto.Flow{
 			ObjectID: "stream-1",

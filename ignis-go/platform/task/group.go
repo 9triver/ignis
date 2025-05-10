@@ -15,7 +15,7 @@ type ActorInfo = proto.ActorInfo
 type ActorGroup struct {
 	name string
 	pq   utils.PQueue[*ActorInfo]
-	cond sync.Cond
+	cond *sync.Cond
 	ch   chan *ActorInfo
 }
 
@@ -45,24 +45,19 @@ func (g *ActorGroup) Push(info *ActorInfo) {
 	g.cond.Broadcast()
 }
 
-func (g *ActorGroup) TaskDone(info *ActorInfo) {
-	g.Push(info)
+func GroupWithLessFunc(name string, lessFunc utils.LessFunc[*ActorInfo], candidates ...*ActorInfo) *ActorGroup {
+	return &ActorGroup{
+		name: name,
+		pq:   utils.MakePriorityQueue(lessFunc, candidates...),
+		cond: sync.NewCond(&sync.Mutex{}),
+		ch:   make(chan *ActorInfo),
+	}
 }
 
 func NewGroup(name string, candidates ...*ActorInfo) *ActorGroup {
-	pq := utils.MakePriorityQueue(func(i, j *ActorInfo) bool {
+	return GroupWithLessFunc(name, func(i, j *ActorInfo) bool {
 		return i.LinkLatency*2+i.CalcLatency < j.LinkLatency*2+j.CalcLatency
-	})
-	for _, info := range candidates {
-		pq.Push(info)
-	}
-
-	return &ActorGroup{
-		name: name,
-		cond: *sync.NewCond(&sync.Mutex{}),
-		ch:   make(chan *ActorInfo),
-		pq:   pq,
-	}
+	}, candidates...)
 }
 
 type GroupedTaskHandler struct {

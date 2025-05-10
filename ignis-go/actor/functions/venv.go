@@ -10,7 +10,7 @@ import (
 
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils"
@@ -22,8 +22,8 @@ type VirtualEnv struct {
 	ctx     context.Context
 	handler remote.Executor
 	started bool
-	futures map[string]utils.Future[messages.Object]
-	streams map[string]*messages.LocalStream
+	futures map[string]utils.Future[objects.Interface]
+	streams map[string]*objects.Stream
 
 	Name     string   `json:"name"`
 	Exec     string   `json:"exec"`
@@ -68,11 +68,11 @@ func (v *VirtualEnv) AddPackages(p ...string) error {
 	return nil
 }
 
-func (v *VirtualEnv) Execute(name, method string, args map[string]messages.Object) utils.Future[messages.Object] {
-	fut := utils.NewFuture[messages.Object](configs.ExecutionTimeout)
-	encoded := make(map[string]*proto.EncodedObject)
+func (v *VirtualEnv) Execute(name, method string, args map[string]objects.Interface) utils.Future[objects.Interface] {
+	fut := utils.NewFuture[objects.Interface](configs.ExecutionTimeout)
+	encoded := make(map[string]*objects.Remote)
 	for param, obj := range args {
-		enc, err := obj.GetEncoded()
+		enc, err := obj.Encode()
 		if err != nil {
 			fut.Reject(err)
 			return fut
@@ -87,14 +87,14 @@ func (v *VirtualEnv) Execute(name, method string, args map[string]messages.Objec
 	v.handler.SendChan() <- msg
 
 	for _, arg := range args {
-		if stream, ok := arg.(*messages.LocalStream); ok {
+		if stream, ok := arg.(*objects.Stream); ok {
 			chunks := stream.ToChan()
 			go func() {
 				defer func() {
 					v.handler.SendChan() <- executor.NewStreamEnd(v.Name, stream.GetID())
 				}()
 				for chunk := range chunks {
-					encoded, err := chunk.GetEncoded()
+					encoded, err := chunk.Encode()
 					v.handler.SendChan() <- executor.NewStreamChunk(v.Name, stream.GetID(), encoded, err)
 				}
 			}()
@@ -120,10 +120,10 @@ func (v *VirtualEnv) onReturn(ret *executor.Return) {
 		return
 	}
 
-	var o messages.Object
+	var o objects.Interface
 	if obj.Stream { // return a stream from python
-		values := make(chan messages.Object)
-		ls := messages.NewLocalStream(values, obj.GetLanguage())
+		values := make(chan objects.Interface)
+		ls := objects.NewStream(values, obj.GetLanguage())
 		v.streams[ret.CorrID] = ls
 		o = ls
 	} else {

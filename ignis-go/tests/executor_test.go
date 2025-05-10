@@ -9,8 +9,7 @@ import (
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/messages"
-	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/objects"
 )
 
 func TestVenvExecutor(t *testing.T) {
@@ -54,9 +53,9 @@ func TestVenvExecutor(t *testing.T) {
 }
 
 func testDirect(t *testing.T, env *functions.VirtualEnv) {
-	params := make(map[string]messages.Object)
-	params["a"] = messages.NewLocalObject(10, proto.LangJson)
-	params["b"] = messages.NewLocalObject(2, proto.LangJson)
+	params := make(map[string]objects.Interface)
+	params["a"] = objects.NewLocal(10, objects.LangJson)
+	params["b"] = objects.NewLocal(2, objects.LangJson)
 	fut := env.Execute("__add", "call", params)
 	ret, err := fut.Result()
 	t.Log(ret, err)
@@ -70,20 +69,20 @@ func testJoin(t *testing.T, env *functions.VirtualEnv) {
 			ints <- i
 		}
 	}()
-	params := make(map[string]messages.Object)
-	params["ints"] = messages.NewLocalStream(ints, proto.LangJson)
+	params := make(map[string]objects.Interface)
+	params["ints"] = objects.NewStream(ints, objects.LangJson)
 	fut := env.Execute("__sum", "call", params)
 	ret, err := fut.Result()
 	t.Log(ret, err)
 }
 
 func testStream(t *testing.T, env *functions.VirtualEnv) {
-	params := make(map[string]messages.Object)
-	params["n"] = messages.NewLocalObject(10, proto.LangJson)
+	params := make(map[string]objects.Interface)
+	params["n"] = objects.NewLocal(10, objects.LangJson)
 	fut := env.Execute("__gen", "call", params)
 	ret, _ := fut.Result()
 
-	s := ret.(*messages.LocalStream)
+	s := ret.(*objects.Stream)
 	for obj := range s.ToChan() {
 		t.Log(obj)
 	}
@@ -97,12 +96,12 @@ func testMap(t *testing.T, env *functions.VirtualEnv) {
 			ints <- i
 		}
 	}()
-	params := make(map[string]messages.Object)
-	params["ints"] = messages.NewLocalStream(ints, proto.LangJson)
+	params := make(map[string]objects.Interface)
+	params["ints"] = objects.NewStream(ints, objects.LangJson)
 	fut := env.Execute("__map", "call", params)
 	ret, _ := fut.Result()
 
-	s := ret.(*messages.LocalStream)
+	s := ret.(*objects.Stream)
 	for obj := range s.ToChan() {
 		t.Log(obj)
 	}

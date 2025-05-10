@@ -14,12 +14,15 @@ import (
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/remote"
 )
 
 func TestController(t *testing.T) {
 	cm := rpc.NewManager("127.0.0.1:8082")
 	em := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
 	sys := actor.NewActorSystem()
+	remoter := remote.NewRemote(sys, remote.Configure("127.0.0.1", 3001))
+	remoter.Start()
 	storeRef := store.Spawn(sys.Root, stub.NewActorStub(sys), "store")
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 1000*time.Second)

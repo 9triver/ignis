@@ -10,7 +10,7 @@ import (
 
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/remote/ipc"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -82,8 +82,8 @@ func (m *VenvManager) createEnv(name string) (*VirtualEnv, error) {
 	return &VirtualEnv{
 		ctx:      m.ctx,
 		handler:  m.em.NewExecutor(m.ctx, name),
-		futures:  make(map[string]utils.Future[messages.Object]),
-		streams:  make(map[string]*messages.LocalStream),
+		futures:  make(map[string]utils.Future[objects.Interface]),
+		streams:  make(map[string]*objects.Stream),
 		Name:     name,
 		Exec:     path.Join(venvPath, "bin", "python"),
 		Packages: []string{"pyzmq"},
@@ -156,8 +156,8 @@ func NewVenvManager(ctx context.Context, manager remote.ExecutorManager) (*VenvM
 		env.started = false
 		env.ctx = ctx
 		env.handler = manager.NewExecutor(ctx, env.Name)
-		env.futures = make(map[string]utils.Future[messages.Object])
-		env.streams = make(map[string]*messages.LocalStream)
+		env.futures = make(map[string]utils.Future[objects.Interface])
+		env.streams = make(map[string]*objects.Stream)
 	}
 	return m, nil
 }

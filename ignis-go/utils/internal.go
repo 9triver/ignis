@@ -138,7 +138,20 @@ func MapToStruct[I any](invoke map[string]any) (ret I, err error) {
 	return input, nil
 }
 
-func MapToStruct2(t reflect.Type, value any) (ret reflect.Value, err error) {
+func _MapToStruct[I any](invoke map[string]any) (ret I, err error) {
+	rv, err := mapToStruct(reflect.TypeFor[I](), invoke)
+	if err != nil {
+		return
+	}
+	ret, ok := rv.Interface().(I)
+	if !ok {
+		err = errors.New("output type is not an I")
+		return
+	}
+	return
+}
+
+func mapToStruct(t reflect.Type, value any) (ret reflect.Value, err error) {
 	asValue := true
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -165,7 +178,7 @@ func MapToStruct2(t reflect.Type, value any) (ret reflect.Value, err error) {
 		var rv reflect.Value
 		if fieldType.Kind() == reflect.Struct ||
 			(fieldType.Kind() == reflect.Pointer && fieldType.Elem().Kind() == reflect.Struct) {
-			child, err := MapToStruct2(fieldType, v)
+			child, err := mapToStruct(fieldType, v)
 			if err != nil {
 				return ret, err
 			}

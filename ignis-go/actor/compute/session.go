@@ -5,7 +5,8 @@ import (
 
 	"github.com/asynkron/protoactor-go/actor"
 
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -14,7 +15,7 @@ type Session struct {
 	id       string
 	store    *actor.PID
 	executor *Executor
-	params   map[string]messages.Object
+	params   map[string]objects.Interface
 	start    *SessionStart
 	deps     utils.Set[string]
 	link     time.Duration
@@ -23,7 +24,7 @@ type Session struct {
 type SessionInvoke struct {
 	Param string
 	Link  time.Duration
-	Value messages.Object
+	Value objects.Interface
 }
 
 type SessionStart struct {
@@ -54,7 +55,7 @@ func (s *Session) doInvoke(ctx actor.Context) {
 		Context:   ctx,
 		SessionID: s.id,
 		Params:    s.params,
-		OnDone: func(obj messages.Object, err error, duration time.Duration) {
+		OnDone: func(obj objects.Interface, err error, duration time.Duration) {
 			if err != nil {
 				ctx.Send(s.store, &proto.InvokeRemote{
 					Target: s.start.ReplyTo,
@@ -70,7 +71,7 @@ func (s *Session) doInvoke(ctx actor.Context) {
 			info.CalcLatency = (info.CalcLatency + int64(duration)) / 2
 			info.LinkLatency = (info.LinkLatency + int64(s.link)) / 2
 
-			save := &messages.SaveObject{
+			save := &store.SaveObject{
 				Value: obj,
 				Callback: func(ctx actor.Context, ref *proto.Flow) {
 					ctx.Send(s.store, &proto.InvokeRemote{
@@ -110,7 +111,7 @@ func NewSession(
 			id:       id,
 			store:    store,
 			executor: executor,
-			params:   make(map[string]messages.Object),
+			params:   make(map[string]objects.Interface),
 			deps:     utils.MakeSetFromSlice(executor.Deps()),
 		}
 	})

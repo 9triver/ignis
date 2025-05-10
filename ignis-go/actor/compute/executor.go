@@ -7,14 +7,14 @@ import (
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 )
 
 type ExecInput struct {
 	Context   actor.Context
 	SessionID string
-	Params    map[string]messages.Object
-	OnDone    func(obj messages.Object, err error, duration time.Duration)
+	Params    map[string]objects.Interface
+	OnDone    func(obj objects.Interface, err error, duration time.Duration)
 }
 
 type Executor struct {

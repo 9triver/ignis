@@ -1,26 +1,25 @@
-package messages
+package objects
 
 import (
 	"reflect"
 	"sync"
 
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
 
-type LocalStream struct {
+type Stream struct {
 	once      sync.Once
 	mu        sync.RWMutex
-	consumers []chan Object
+	consumers []chan Interface
 
 	id        string
 	completed bool
-	language  proto.Language
-	values    chan Object
+	language  Language
+	values    chan Interface
 }
 
-func (s *LocalStream) EnqueueChunk(chunk Object) {
+func (s *Stream) EnqueueChunk(chunk Interface) {
 	if s.completed {
 		return
 	}
@@ -34,27 +33,27 @@ func (s *LocalStream) EnqueueChunk(chunk Object) {
 	s.values <- chunk
 }
 
-func (s *LocalStream) GetID() string {
+func (s *Stream) GetID() string {
 	return s.id
 }
 
-func (s *LocalStream) GetLanguage() proto.Language {
+func (s *Stream) GetLanguage() Language {
 	return s.language
 }
 
-func (s *LocalStream) GetEncoded() (*proto.EncodedObject, error) {
-	return &proto.EncodedObject{
+func (s *Stream) Encode() (*Remote, error) {
+	return &Remote{
 		ID:       s.id,
 		Language: s.language,
 		Stream:   true,
 	}, nil
 }
 
-func (s *LocalStream) GetValue() (any, error) {
+func (s *Stream) Value() (any, error) {
 	return s.values, nil
 }
 
-func (s *LocalStream) doStart() {
+func (s *Stream) doStart() {
 	defer func() {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
@@ -73,8 +72,8 @@ func (s *LocalStream) doStart() {
 	}
 }
 
-func (s *LocalStream) ToChan() <-chan Object {
-	ch := make(chan Object)
+func (s *Stream) ToChan() <-chan Interface {
+	ch := make(chan Interface)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -85,14 +84,14 @@ func (s *LocalStream) ToChan() <-chan Object {
 	return ch
 }
 
-func NewLocalStream(values any, language proto.Language) *LocalStream {
-	return NewLocalStreamWithID(utils.GenIDWith("stream."), values, language)
+func NewStream(values any, language Language) *Stream {
+	return StreamWithID(utils.GenIDWith("stream."), values, language)
 }
 
-func NewLocalStreamWithID(id string, values any, language proto.Language) *LocalStream {
-	s := &LocalStream{
+func StreamWithID(id string, values any, language Language) *Stream {
+	s := &Stream{
 		id:       id,
-		values:   make(chan Object, configs.ChannelBufferSize),
+		values:   make(chan Interface, configs.ChannelBufferSize),
 		language: language,
 	}
 
@@ -109,10 +108,10 @@ func NewLocalStreamWithID(id string, values any, language proto.Language) *Local
 				return
 			}
 
-			if obj, ok := v.Interface().(Object); ok {
+			if obj, ok := v.Interface().(Interface); ok {
 				s.EnqueueChunk(obj)
 			} else {
-				s.EnqueueChunk(NewLocalObject(v.Interface(), language))
+				s.EnqueueChunk(NewLocal(v.Interface(), language))
 			}
 		}
 	}()

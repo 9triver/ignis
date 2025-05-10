@@ -2,6 +2,7 @@ package actor_test
 
 import (
 	"context"
+	"github.com/9triver/ignis/utils"
 	"path"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ import (
 	"github.com/9triver/ignis/actor/remote/stub"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -35,10 +36,10 @@ func rpcClient(computeRef *proto.ActorRef) {
 		panic(err)
 	}
 
-	err = stream.Send(controller.NewAppendData("session-0", &proto.EncodedObject{
+	err = stream.Send(controller.NewAppendData("session-0", &objects.Remote{
 		ID:       "obj-1",
 		Data:     []byte("123456"),
-		Language: proto.LangJson,
+		Language: objects.LangJson,
 	}))
 	if err != nil {
 		panic(err)
@@ -57,7 +58,7 @@ func rpcClient(computeRef *proto.ActorRef) {
 		panic(err)
 	}
 
-	encoded, _ := messages.NewLocalObject(10, proto.LangJson).GetEncoded()
+	encoded, _ := objects.NewLocal(10, objects.LangJson).Encode()
 	err = stream.Send(controller.NewAppendArgFromEncoded("session-0", "instance-0", "func", "B", encoded))
 	if err != nil {
 		panic(err)
@@ -78,7 +79,7 @@ func rpcClient(computeRef *proto.ActorRef) {
 }
 
 func TestRemoteTask(t *testing.T) {
-	sys := actor.NewActorSystem()
+	sys := actor.NewActorSystem(utils.WithLogger("task.log"))
 	cm := rpc.NewManager("127.0.0.1:8082")
 	em := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
 	ctx, cancel := context.WithTimeout(context.TODO(), 120*time.Second)
@@ -92,7 +93,7 @@ func TestRemoteTask(t *testing.T) {
 
 	taskFunc := functions.NewGo("graph-task", func(args Input) (ret int, err error) {
 		return args.A + args.B, nil
-	}, proto.LangJson)
+	}, objects.LangJson)
 	computePID := sys.Root.Spawn(compute.NewActor("graph-task", taskFunc, storeRef.PID))
 
 	go func() {

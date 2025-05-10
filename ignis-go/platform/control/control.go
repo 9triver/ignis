@@ -2,6 +2,7 @@ package control
 
 import (
 	"fmt"
+	"github.com/9triver/ignis/actor/store"
 	"strings"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -9,7 +10,6 @@ import (
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote"
-	"github.com/9triver/ignis/messages"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -23,7 +23,7 @@ type Controller struct {
 
 	nodes    map[string]*task.Node
 	groups   map[string]*task.ActorGroup
-	runtimes map[string]*actor.PID
+	runtimes map[string]*task.Runtime
 }
 
 func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
@@ -90,7 +90,7 @@ func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData
 		"id", obj.ID,
 		"session", data.SessionID,
 	)
-	ctx.Send(c.store.PID, &messages.SaveObject{
+	ctx.Send(c.store.PID, &store.SaveObject{
 		Value: obj,
 		Callback: func(ctx actor.Context, ref *proto.Flow) {
 			ret := controller.NewReturnResult(data.SessionID, "", obj.ID, ref, nil)
@@ -107,20 +107,19 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 		"instance", arg.InstanceID,
 	)
 	sessionId := fmt.Sprintf("%s::%s::%s", arg.Name, arg.SessionID, arg.InstanceID)
-	pid, ok := c.runtimes[sessionId]
+	rt, ok := c.runtimes[sessionId]
 	if !ok {
 		node, ok := c.nodes[arg.Name]
 		if !ok {
 			return
 		}
 
-		props := node.Props(sessionId, c.store.PID, &proto.ActorRef{
+		rt = node.Runtime(sessionId, c.store.PID, &proto.ActorRef{
 			Store: c.store,
 			ID:    "controller",
 			PID:   ctx.Self(),
 		})
-		pid, _ = ctx.SpawnNamed(props, "runtime."+sessionId)
-		c.runtimes[sessionId] = pid
+		c.runtimes[sessionId] = rt
 	}
 
 	switch v := arg.Value.Object.(type) {
@@ -130,9 +129,16 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 			Param:     arg.Param,
 			Value:     v.Ref,
 		}
-		ctx.Send(pid, invoke)
+		if err := rt.Invoke(ctx, invoke); err != nil {
+			ctx.Logger().Error("control: invoke error",
+				"name", arg.Name,
+				"param", arg.Param,
+				"session", arg.SessionID,
+				"instance", arg.InstanceID,
+			)
+		}
 	case *controller.Data_Encoded:
-		save := &messages.SaveObject{
+		save := &store.SaveObject{
 			Value: v.Encoded,
 			Callback: func(ctx actor.Context, ref *proto.Flow) {
 				invoke := &proto.Invoke{
@@ -140,15 +146,18 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 					Param:     arg.Param,
 					Value:     ref,
 				}
-				ctx.Send(pid, invoke)
+				if err := rt.Invoke(ctx, invoke); err != nil {
+					ctx.Logger().Error("control: invoke error",
+						"name", arg.Name,
+						"param", arg.Param,
+						"session", arg.SessionID,
+						"instance", arg.InstanceID,
+					)
+				}
 			},
 		}
 		ctx.Send(c.store.PID, save)
 	}
-}
-
-func (c *Controller) onUnknown(ctx actor.Context, msg *controller.Message) {
-	ctx.Logger().Info("control: unknown message", "msg", msg)
 }
 
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
@@ -161,8 +170,6 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 		c.onAppendData(ctx, cmd.AppendData)
 	case *controller.Message_AppendArg:
 		c.onAppendArg(ctx, cmd.AppendArg)
-	default:
-		c.onUnknown(ctx, msg)
 	}
 }
 
@@ -177,7 +184,7 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeRemote) {
 	)
 
 	if group, ok := c.groups[name]; ok {
-		group.TaskDone(ir.Info)
+		group.Push(ir.Info)
 	}
 
 	var msg *controller.Message
@@ -213,7 +220,7 @@ func SpawnTaskController(
 			store:      store,
 			nodes:      make(map[string]*task.Node),
 			groups:     make(map[string]*task.ActorGroup),
-			runtimes:   make(map[string]*actor.PID),
+			runtimes:   make(map[string]*task.Runtime),
 		}
 	})
 

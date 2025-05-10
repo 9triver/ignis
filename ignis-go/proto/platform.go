@@ -9,13 +9,6 @@ import (
 	"github.com/9triver/ignis/utils/errors"
 )
 
-const (
-	LangUnknown = Language_LANG_UNKNOWN
-	LangJson    = Language_LANG_JSON
-	LangGo      = Language_LANG_GO
-	LangPython  = Language_LANG_PYTHON
-)
-
 func NewStreamChunk(streamId string, value *EncodedObject, err error) *StreamChunk {
 	chunk := &StreamChunk{StreamID: streamId, EoS: false}
 	if err != nil {
@@ -39,11 +32,14 @@ type EncodedObject struct {
 }
 */
 
-func (obj *EncodedObject) GetEncoded() (*EncodedObject, error) {
+func (obj *EncodedObject) Encode() (*EncodedObject, error) {
 	return obj, nil
 }
 
-func (obj *EncodedObject) asObject() (any, error) {
+func (obj *EncodedObject) Value() (any, error) {
+	if obj.Stream {
+		return nil, errors.New("cannot get object directly on stream")
+	}
 	switch obj.Language {
 	case Language_LANG_JSON:
 		var v any
@@ -63,13 +59,6 @@ func (obj *EncodedObject) asObject() (any, error) {
 	default:
 		return nil, errors.New("unknown language")
 	}
-}
-
-func (obj *EncodedObject) GetValue() (any, error) {
-	if obj.Stream {
-		return nil, errors.New("cannot get object directly on stream")
-	}
-	return obj.asObject()
 }
 
 func (ref *StoreRef) Equals(other *StoreRef) bool {
