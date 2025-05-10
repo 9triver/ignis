@@ -1,12 +1,17 @@
 package utils
 
 import (
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/lmittmann/tint"
 	"io"
 	"log/slog"
 	"os"
+	"time"
+
+	"github.com/lithammer/shortuuid/v4"
 )
 
-func Logger(logPaths ...string) *slog.Logger {
+func WithLogger(logPaths ...string) actor.ConfigOption {
 	writers := []io.Writer{os.Stderr}
 	for _, log := range logPaths {
 		w, err := os.OpenFile(log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -16,7 +21,19 @@ func Logger(logPaths ...string) *slog.Logger {
 		writers = append(writers, w)
 	}
 
-	return slog.New(slog.NewTextHandler(io.MultiWriter(writers...), &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
+	return actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
+		return slog.New(tint.NewHandler(io.MultiWriter(writers...), &tint.Options{
+			AddSource:  true,
+			Level:      slog.LevelDebug,
+			TimeFormat: time.DateTime,
+		})).With("system", system.ID)
+	})
+}
+
+func GenID() string {
+	return shortuuid.New()
+}
+
+func GenIDWith(prefix string) string {
+	return prefix + shortuuid.New()
 }

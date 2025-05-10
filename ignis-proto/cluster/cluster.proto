@@ -1,0 +1,36 @@
+syntax = "proto3";
+package proto;
+option go_package = "github.com/9triver/ignis/proto/cluster";
+
+import "platform.proto";
+
+enum MessageType {
+  UNSPECIFIED = 0;
+  OBJECT_REQUEST = 1;
+  OBJECT_RESPONSE = 2;
+  STREAM_CHUNK = 3;
+}
+
+// ObjectRequest requests object with ID, and the object is sent to ReplyTo, asynchronously.
+// if the object is a stream, the stream **object** is sent to ReplyTo by ObjectRequest,
+// but no real stream chunk is transmitted.
+message ObjectRequest {
+  string ID = 1;
+  proto.StoreRef ReplyTo = 2;
+}
+
+message ObjectResponse {
+  string ID = 1;
+  proto.EncodedObject Value = 2;
+  string Error = 3;
+}
+
+message Envelope {
+  proto.StoreRef Store = 1;
+  MessageType Type = 2;
+  oneof Message {
+    ObjectRequest ObjectRequest = 3;
+    ObjectResponse ObjectResponse = 4;
+    proto.StreamChunk StreamChunk = 5;
+  }
+}

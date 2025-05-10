@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"github.com/asynkron/protoactor-go/actor"
 	pb "google.golang.org/protobuf/proto"
 
 	"github.com/9triver/ignis/proto"
@@ -36,11 +35,11 @@ func NewAppendPyFunc(name string, params []string, venv string, requirements []s
 	return NewMessage(cmd)
 }
 
-func NewAppendActor(name string, params []string, pid *actor.PID) *Message {
+func NewAppendActor(name string, params []string, ref *proto.ActorRef) *Message {
 	cmd := &AppendActor{
 		Name:   name,
 		Params: params,
-		PID:    pid,
+		Ref:    ref,
 	}
 	return NewMessage(cmd)
 }

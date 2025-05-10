@@ -2,9 +2,9 @@ package functions
 
 import (
 	"strings"
+	"time"
 
-	"github.com/9triver/ignis/actor/functions/python"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils/errors"
@@ -12,14 +12,12 @@ import (
 
 type PyFunction struct {
 	FuncDec
-	venv     *python.VirtualEnv
+	venv     *VirtualEnv
 	language proto.Language
 }
 
-var _ Function = (*PyFunction)(nil)
-
 func NewPy(
-	manager *python.VenvManager,
+	manager *VenvManager,
 	name string,
 	params []string,
 	venv string,
@@ -32,7 +30,7 @@ func NewPy(
 }
 
 func ImplPy(
-	manager *python.VenvManager,
+	manager *VenvManager,
 	dec FuncDec,
 	venv string,
 	packages []string,
@@ -55,7 +53,7 @@ func ImplPy(
 	}, nil
 }
 
-func (f *PyFunction) Call(params map[string]messages.Object) (messages.Object, error) {
+func (f *PyFunction) Call(params map[string]objects.Interface) (objects.Interface, error) {
 	segs := strings.Split(f.Name(), ".")
 	var obj, method string
 	if len(segs) >= 2 {
@@ -68,6 +66,12 @@ func (f *PyFunction) Call(params map[string]messages.Object) (messages.Object, e
 		return nil, errors.WrapWith(err, "%s: execution failed", f.name)
 	}
 	return result, nil
+}
+
+func (f *PyFunction) TimedCall(params map[string]objects.Interface) (time.Duration, objects.Interface, error) {
+	start := time.Now()
+	obj, err := f.Call(params)
+	return time.Since(start), obj, err
 }
 
 func (f *PyFunction) Language() proto.Language {

@@ -1,0 +1,94 @@
+syntax = "proto3";
+package controller;
+option go_package = "github.com/9triver/ignis/proto/controller";
+
+import "platform.proto";
+
+enum CommandType {
+  UNSPECIFIED = 0; // unknown command type
+  ACK = 1; // acknowledged
+  FR_READY = 2;
+  FR_APPEND_DATA = 3; // frontend: append data node
+  FR_APPEND_ACTOR = 4; // front: append actor (for debugging purpose)
+  FR_APPEND_PY_FUNC = 5; // frontend: append python function (control node definition)
+  FR_APPEND_ARG = 6; // frontend: append function arg to specified actor
+  BK_RETURN_RESULT = 7; // backend: send back execution result
+}
+
+message Ack {
+  string Error = 1;
+}
+
+message Ready {}
+
+message Data {
+  enum ObjectType {
+    OBJ_UNSPECIFIED = 0;
+    OBJ_REF = 1;
+    OBJ_ENCODED = 2;
+    OBJ_STREAM = 3;
+  }
+
+  ObjectType Type = 1;
+  oneof Object {
+    proto.Flow Ref = 2;
+    proto.EncodedObject Encoded = 3;
+  }
+}
+
+message AppendData {
+  string SessionID = 1; // current execution session, empty if shared by all sessions
+  proto.EncodedObject Object = 2; // encoded object
+}
+
+message AppendActor {
+  string Name = 1; // actor name
+  repeated string Params = 2; // function params
+  proto.ActorRef Ref = 3; // Ref to actor
+}
+
+message AppendPyFunc {
+  string Name = 1; // function name
+  repeated string Params = 2; //function params
+  string Venv = 3; // function virtual environment
+  repeated string Requirements = 4; // function dependencies
+  bytes PickledObject = 5; // encoded function impl
+  proto.Language Language = 6; // return type of function
+  // TODO: Resources
+  int32 Replicas = 7;
+}
+
+message AppendArg {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of function instance under current execution session
+  string Name = 3; // function name
+  string Param = 4; // param name
+  Data Value = 5; // object ref for param
+}
+
+message ReturnResult {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of function instance under current execution session
+  string Name = 3; // function name
+  oneof Result {
+    Data Value = 4; // success: return result
+    string Error = 5; // fail: return error
+  }
+}
+
+message Message {
+  CommandType Type = 1;
+  oneof Command {
+    Ack Ack = 2;
+    Ready Ready = 3;
+    AppendData AppendData = 4;
+    AppendActor AppendActor = 5;
+    AppendPyFunc AppendPyFunc = 6;
+    AppendArg AppendArg = 7;
+    ReturnResult ReturnResult = 8;
+  }
+}
+
+service Service {
+  rpc Session(stream Message) returns (stream Message) {}
+}

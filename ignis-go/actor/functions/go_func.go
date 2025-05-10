@@ -2,8 +2,9 @@ package functions
 
 import (
 	"reflect"
+	"time"
 
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
@@ -15,16 +16,14 @@ type GoFunction[I, O any] struct {
 	language proto.Language
 }
 
-var _ Function = (*GoFunction[any, any])(nil)
-
-func (h *GoFunction[I, O]) Call(params map[string]messages.Object) (messages.Object, error) {
+func (h *GoFunction[I, O]) Call(params map[string]objects.Interface) (objects.Interface, error) {
 	invoke := make(map[string]any)
 	for k, v := range params {
 		var value any
-		if s, ok := v.(*messages.LocalStream); ok {
+		if s, ok := v.(*objects.Stream); ok {
 			value = s.ToChan()
 		} else {
-			vv, err := v.GetValue()
+			vv, err := v.Value()
 			if err != nil {
 				return nil, errors.WrapWith(err, "call: failed fetching param %s", k)
 			}
@@ -44,13 +43,19 @@ func (h *GoFunction[I, O]) Call(params map[string]messages.Object) (messages.Obj
 	}
 
 	t := reflect.TypeFor[O]()
-	var obj messages.Object
+	var obj objects.Interface
 	if t.Kind() == reflect.Chan {
-		obj = messages.NewLocalStream(o, h.language)
+		obj = objects.NewStream(o, h.language)
 	} else {
-		obj = messages.NewLocalObject(o, h.language)
+		obj = objects.NewLocal(o, h.language)
 	}
 	return obj, nil
+}
+
+func (h *GoFunction[I, O]) TimedCall(params map[string]objects.Interface) (time.Duration, objects.Interface, error) {
+	start := time.Now()
+	obj, err := h.Call(params)
+	return time.Since(start), obj, err
 }
 
 func (h *GoFunction[I, O]) Language() proto.Language {

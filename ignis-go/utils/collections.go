@@ -1,6 +1,11 @@
 package utils
 
+import (
+	"container/heap"
+)
+
 type Set[T comparable] map[T]struct{}
+type LessFunc[T any] func(i, j T) bool
 
 func (s Set[T]) Values() []T {
 	keys := make([]T, 0, len(s))
@@ -43,10 +48,6 @@ func (s Set[T]) Copy() Set[T] {
 	return MakeSetFromSlice(s.Values())
 }
 
-func MakeSet[T comparable]() Set[T] {
-	return make(Set[T])
-}
-
 func MakeSetFromSlice[T comparable](slice []T) Set[T] {
 	set := make(Set[T])
 	for _, value := range slice {
@@ -55,71 +56,60 @@ func MakeSetFromSlice[T comparable](slice []T) Set[T] {
 	return set
 }
 
-type Map[K comparable, V any] map[K]V
-
-func (s Map[K, V]) Keys() []K {
-	keys := make([]K, 0, len(s))
-	for key := range s {
-		keys = append(keys, key)
-	}
-	return keys
+type heapImpl[T any] struct {
+	data []T
+	less LessFunc[T]
 }
 
-func (s Map[K, V]) KeySet() Set[K] {
-	return MakeSetFromSlice(s.Keys())
+var _ heap.Interface = (*heapImpl[int])(nil)
+
+func (h *heapImpl[T]) Len() int {
+	return len(h.data)
 }
 
-func (s Map[K, V]) Put(key K, value V) bool {
-	if _, ok := s[key]; ok {
-		return false
-	}
-
-	s[key] = value
-	return true
+func (h *heapImpl[T]) Less(i int, j int) bool {
+	return h.less(h.data[i], h.data[j])
 }
 
-func (s Map[K, V]) Get(key K) (v V, ok bool) {
-	v, ok = s[key]
+func (h *heapImpl[T]) Pop() (ret any) {
+	idx := h.Len() - 1
+	ret, h.data = h.data[idx], h.data[:idx]
 	return
 }
 
-func (s Map[K, V]) Remove(value K) bool {
-	if _, ok := s[value]; !ok {
-		return false
+func (h *heapImpl[T]) Push(x any) {
+	h.data = append(h.data, x.(T))
+}
+
+func (h *heapImpl[T]) Swap(i int, j int) {
+	h.data[i], h.data[j] = h.data[j], h.data[i]
+}
+
+type PQueue[T any] struct {
+	impl *heapImpl[T]
+}
+
+func (pq PQueue[T]) Push(x T) {
+	heap.Push(pq.impl, x)
+}
+
+func (pq PQueue[T]) Pop() T {
+	return heap.Pop(pq.impl).(T)
+}
+
+func (pq PQueue[T]) Remove(i int) T {
+	return heap.Remove(pq.impl, i).(T)
+}
+
+func (pq PQueue[T]) Len() int {
+	return pq.impl.Len()
+}
+
+func MakePriorityQueue[T any](less LessFunc[T], elems ...T) PQueue[T] {
+	impl := &heapImpl[T]{
+		less: less,
+		data: elems,
 	}
-	delete(s, value)
-	return true
-}
-
-func (s Map[K, V]) Contains(value K) bool {
-	_, ok := s[value]
-	return ok
-}
-
-func (s Map[K, V]) ComputeIfAbsent(key K, producer func() V) V {
-	if v, ok := s[key]; ok {
-		return v
-	}
-	s[key] = producer()
-	return s[key]
-}
-
-func (s Map[K, V]) Values() []V {
-	values := make([]V, 0, len(s))
-	for _, value := range s {
-		values = append(values, value)
-	}
-	return values
-}
-
-func (s Map[K, V]) Len() int {
-	return len(s)
-}
-
-func (s Map[K, V]) Empty() bool {
-	return len(s) == 0
-}
-
-func MakeMap[K comparable, V any]() Map[K, V] {
-	return make(Map[K, V])
+	heap.Init(impl)
+	return PQueue[T]{impl}
 }

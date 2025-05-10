@@ -1,11 +1,15 @@
 package store
 
 import (
+	"time"
+
 	"github.com/asynkron/protoactor-go/actor"
 
+	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/messages"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/proto/cluster"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -13,46 +17,24 @@ import (
 type Actor struct {
 	id   string
 	ref  *proto.StoreRef
-	stub Stub
+	stub remote.Stub
 	// localObjects saves objects generated from current system
-	localObjects map[string]messages.Object
+	localObjects map[string]objects.Interface
 	// remoteObjects saves objects from remote stores
-	remoteObjects map[string]utils.Future[messages.Object]
+	remoteObjects map[string]utils.Future[objects.Interface]
 }
 
-// SaveObject is sent to store when actor generates new return objects from functions
-type SaveObject struct {
-	Value    messages.Object                          // object or stream
-	Callback func(ctx actor.Context, ref *proto.Flow) // called when object saving is completed
-}
-
-// RequestObject is sent to store by **local** actors
-type RequestObject struct {
-	ReplyTo *actor.PID
-	Flow    *proto.Flow
-}
-
-// ObjectResponse is sent to request actor
-type ObjectResponse struct {
-	Value messages.Object
-	Error error
-}
-
-func (s *Actor) ID() string {
-	return s.id
-}
-
-func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
-	ctx.Logger().Info("responding object",
+func (s *Actor) onObjectRequest(ctx actor.Context, req *cluster.ObjectRequest) {
+	ctx.Logger().Info("store: responding object",
 		"id", req.ID,
 		"replyTo", req.ReplyTo.ID,
 	)
 
-	reply := &proto.ObjectResponse{ID: req.ID}
+	reply := &cluster.ObjectResponse{ID: req.ID}
 	obj, ok := s.localObjects[req.ID]
 	if !ok {
 		reply.Error = errors.Format("store: object %s not found", req.ID).Error()
-	} else if encoded, err := obj.GetEncoded(); err != nil {
+	} else if encoded, err := obj.Encode(); err != nil {
 		reply.Error = errors.WrapWith(err, "store: object %s encode failed", req.ID).Error()
 	} else {
 		reply.Value = encoded
@@ -60,13 +42,11 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 	s.stub.SendTo(req.ReplyTo, reply)
 
 	// if requested object is a stream, send all chunks
-	if stream, ok := obj.(*messages.LocalStream); ok {
-		eos := proto.NewStreamEnd(req.ID)
+	if stream, ok := obj.(*objects.Stream); ok {
 		go func() {
-			defer s.stub.SendTo(req.ReplyTo, eos)
-			objects := stream.ToChan()
-			for obj := range objects {
-				encoded, err := obj.GetEncoded()
+			defer s.stub.SendTo(req.ReplyTo, proto.NewStreamEnd(req.ID))
+			for obj := range stream.ToChan() {
+				encoded, err := obj.Encode()
 				msg := proto.NewStreamChunk(req.ID, encoded, err)
 				s.stub.SendTo(req.ReplyTo, msg)
 			}
@@ -74,7 +54,7 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *proto.ObjectRequest) {
 	}
 }
 
-func (s *Actor) onObjectResponse(ctx actor.Context, resp *proto.ObjectResponse) {
+func (s *Actor) onObjectResponse(ctx actor.Context, resp *cluster.ObjectResponse) {
 	if resp.Error != "" {
 		ctx.Logger().Error("store: object response error",
 			"id", resp.ID,
@@ -96,7 +76,7 @@ func (s *Actor) onObjectResponse(ctx actor.Context, resp *proto.ObjectResponse) 
 	if !encoded.Stream {
 		fut.Resolve(encoded)
 	} else {
-		ls := messages.NewLocalStream(nil, encoded.Language)
+		ls := objects.NewStream(nil, encoded.Language)
 		fut.Resolve(ls)
 	}
 }
@@ -116,7 +96,7 @@ func (s *Actor) onStreamChunk(ctx actor.Context, chunk *proto.StreamChunk) {
 		return
 	}
 
-	stream, ok := obj.(*messages.LocalStream)
+	stream, ok := obj.(*objects.Stream)
 	if !ok {
 		return
 	}
@@ -134,36 +114,32 @@ func (s *Actor) onSaveObject(ctx actor.Context, save *SaveObject) {
 		"id", obj.GetID(),
 	)
 
-	if stream, ok := obj.(*messages.LocalStream); ok {
-		stream.SetRemote(s.ref)
-	}
-
 	s.localObjects[obj.GetID()] = obj
 
 	if save.Callback != nil {
-		save.Callback(ctx, &proto.Flow{ObjectID: obj.GetID(), Source: s.ref})
+		save.Callback(ctx, &proto.Flow{ID: obj.GetID(), Source: s.ref})
 	}
 }
 
-func (s *Actor) getLocalObject(flow *proto.Flow) (messages.Object, error) {
-	obj, ok := s.localObjects[flow.ObjectID]
+func (s *Actor) getLocalObject(flow *proto.Flow) (objects.Interface, error) {
+	obj, ok := s.localObjects[flow.ID]
 	if !ok {
-		return nil, errors.Format("store: flow %s not found", flow.ObjectID)
+		return nil, errors.Format("store: flow %s not found", flow.ID)
 	}
 	return obj, nil
 }
 
-func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[messages.Object] {
-	if fut, ok := s.remoteObjects[flow.ObjectID]; ok {
+func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[objects.Interface] {
+	if fut, ok := s.remoteObjects[flow.ID]; ok {
 		return fut
 	}
 
-	fut := utils.NewFuture[messages.Object](configs.FlowTimeout)
-	s.remoteObjects[flow.ObjectID] = fut
+	fut := utils.NewFuture[objects.Interface](configs.FlowTimeout)
+	s.remoteObjects[flow.ID] = fut
 
 	remoteRef := flow.Source
-	s.stub.SendTo(remoteRef, &proto.ObjectRequest{
-		ID:      flow.ObjectID,
+	s.stub.SendTo(remoteRef, &cluster.ObjectRequest{
+		ID:      flow.ID,
 		ReplyTo: s.ref,
 	})
 	return fut
@@ -171,7 +147,7 @@ func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[messages.Obje
 
 func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 	ctx.Logger().Info("store: local flow request",
-		"id", req.Flow.ObjectID,
+		"id", req.Flow.ID,
 		"store", req.Flow.Source.ID,
 	)
 
@@ -182,7 +158,7 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 			Error: err,
 		})
 	} else {
-		s.requestRemoteObject(req.Flow).OnDone(func(obj messages.Object, err error) {
+		s.requestRemoteObject(req.Flow).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
 			ctx.Send(req.ReplyTo, &ObjectResponse{
 				Value: obj,
 				Error: err,
@@ -191,30 +167,43 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 	}
 }
 
+func (s *Actor) onForward(ctx actor.Context, forward forwardMessage) {
+	target := forward.GetTarget()
+	if target.Store.Equals(s.ref) { // target is local
+		ctx.Send(target.PID, forward)
+	} else {
+		ctx.Logger().Info("store: forwarding request")
+		s.stub.SendTo(target.Store, forward)
+	}
+}
+
 func (s *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	// Requests from remote stores
-	case *proto.ObjectRequest:
+	case *cluster.ObjectRequest:
 		s.onObjectRequest(ctx, msg)
 	// Responses from remote stores
-	case *proto.ObjectResponse:
+	case *cluster.ObjectResponse:
 		s.onObjectResponse(ctx, msg)
-	case *proto.StreamChunk:
+	case *cluster.StreamChunk:
 		s.onStreamChunk(ctx, msg)
 	// Local actor requests
 	case *SaveObject:
 		s.onSaveObject(ctx, msg)
 	case *RequestObject:
 		s.onFlowRequest(ctx, msg)
+	// forward messages
+	case forwardMessage:
+		s.onForward(ctx, msg)
 	}
 }
 
-func New(stub Stub, id string) *actor.Props {
+func New(stub remote.Stub, id string) *actor.Props {
 	s := &Actor{
 		id:            id,
 		stub:          stub,
-		localObjects:  make(map[string]messages.Object),
-		remoteObjects: make(map[string]utils.Future[messages.Object]),
+		localObjects:  make(map[string]objects.Interface),
+		remoteObjects: make(map[string]utils.Future[objects.Interface]),
 	}
 	return actor.PropsFromProducer(func() actor.Actor {
 		return s
@@ -223,10 +212,29 @@ func New(stub Stub, id string) *actor.Props {
 	}))
 }
 
+func Spawn(ctx *actor.RootContext, stub remote.Stub, id string) *proto.StoreRef {
+	s := &Actor{
+		id:            id,
+		stub:          stub,
+		localObjects:  make(map[string]objects.Interface),
+		remoteObjects: make(map[string]utils.Future[objects.Interface]),
+	}
+	props := actor.PropsFromProducer(func() actor.Actor {
+		return s
+	})
+	pid, _ := ctx.SpawnNamed(props, "store."+id)
+	ref := &proto.StoreRef{
+		ID:  id,
+		PID: pid,
+	}
+	s.ref = ref
+	return ref
+}
+
 // GetObject can be called by actors within the same system
 // It returns a future that resolves to the object or rejects with an error
-func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Future[messages.Object] {
-	fut := utils.NewFuture[messages.Object](configs.FlowTimeout)
+func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Future[objects.Interface] {
+	fut := utils.NewFuture[objects.Interface](configs.FlowTimeout)
 	if flow == nil {
 		fut.Reject(errors.New("flow is nil"))
 		return fut
@@ -236,12 +244,12 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 		switch msg := c.Message().(type) {
 		case *ObjectResponse:
 			if msg.Error != nil {
-				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ObjectID))
+				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ID))
 				return
 			}
 
-			if msg.Value.GetID() != flow.ObjectID {
-				err := errors.Format("flow %s received unexpected ID %s", flow.ObjectID, msg.Value.GetID())
+			if msg.Value.GetID() != flow.ID {
+				err := errors.Format("flow %s received unexpected ID %s", flow.ID, msg.Value.GetID())
 				fut.Reject(err)
 				return
 			}

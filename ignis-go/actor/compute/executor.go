@@ -7,15 +7,15 @@ import (
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/messages"
-	"github.com/9triver/ignis/utils"
+	"github.com/9triver/ignis/objects"
 )
 
 type ExecInput struct {
 	Context   actor.Context
 	SessionID string
-	Params    map[string]messages.Object
-	OnDone    func(obj messages.Object, err error, duration time.Duration)
+	Params    map[string]objects.Interface
+	Timed     bool
+	OnDone    func(obj objects.Interface, err error, duration time.Duration)
 }
 
 type Executor struct {
@@ -23,15 +23,19 @@ type Executor struct {
 	handler  functions.Function
 }
 
-func (e *Executor) Deps() utils.Set[string] {
+func (e *Executor) Deps() []string {
 	return e.handler.Params()
 }
 
 func (e *Executor) doStart() {
 	for req := range e.requests {
-		tic := time.Now()
-		obj, err := e.handler.Call(req.Params)
-		req.OnDone(obj, err, time.Since(tic))
+		if req.Timed {
+			duration, obj, err := e.handler.TimedCall(req.Params)
+			req.OnDone(obj, err, duration)
+		} else {
+			obj, err := e.handler.Call(req.Params)
+			req.OnDone(obj, err, 0)
+		}
 	}
 }
 

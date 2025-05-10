@@ -4,15 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 
 	"github.com/9triver/ignis/utils/errors"
-)
-
-const (
-	LangUnknown = Language_LANG_UNKNOWN
-	LangJson    = Language_LANG_JSON
-	LangGo      = Language_LANG_GO
-	LangPython  = Language_LANG_PYTHON
 )
 
 func NewStreamChunk(streamId string, value *EncodedObject, err error) *StreamChunk {
@@ -38,11 +32,14 @@ type EncodedObject struct {
 }
 */
 
-func (obj *EncodedObject) GetEncoded() (*EncodedObject, error) {
+func (obj *EncodedObject) Encode() (*EncodedObject, error) {
 	return obj, nil
 }
 
-func (obj *EncodedObject) asObject() (any, error) {
+func (obj *EncodedObject) Value() (any, error) {
+	if obj.Stream {
+		return nil, errors.New("cannot get object directly on stream")
+	}
 	switch obj.Language {
 	case Language_LANG_JSON:
 		var v any
@@ -64,9 +61,28 @@ func (obj *EncodedObject) asObject() (any, error) {
 	}
 }
 
-func (obj *EncodedObject) GetValue() (any, error) {
-	if obj.Stream {
-		return nil, errors.New("cannot get object directly on stream")
+func (ref *StoreRef) Equals(other *StoreRef) bool {
+	if other == nil {
+		return false
 	}
-	return obj.asObject()
+	return ref.ID == other.ID
+}
+
+func (ref *StoreRef) Addr() string {
+	return fmt.Sprintf("store.%s", ref.ID)
+}
+
+func (ref *ActorRef) Equals(other *ActorRef) bool {
+	if other == nil {
+		return false
+	}
+	return ref.ID == other.ID && ref.Store.Equals(other.Store)
+}
+
+func (ref *ActorRef) Addr() string {
+	return fmt.Sprintf("actor.%s@%s", ref.ID, ref.Store.Addr())
+}
+
+func (sr *InvokeStart) GetTarget() *ActorRef {
+	return sr.Info.Ref
 }
