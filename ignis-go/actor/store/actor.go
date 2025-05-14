@@ -151,18 +151,12 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 		"store", req.Flow.Source.ID,
 	)
 
-	if req.Flow.Source.ID == s.ref.ID {
+	if req.Flow.Source.Equals(s.ref) {
 		obj, err := s.getLocalObject(req.Flow)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
-			Value: obj,
-			Error: err,
-		})
+		req.Callback(ctx, obj, err)
 	} else {
 		s.requestRemoteObject(req.Flow).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
-			ctx.Send(req.ReplyTo, &ObjectResponse{
-				Value: obj,
-				Error: err,
-			})
+			req.Callback(ctx, obj, err)
 		})
 	}
 }
@@ -174,6 +168,16 @@ func (s *Actor) onForward(ctx actor.Context, forward forwardMessage) {
 	} else {
 		ctx.Logger().Info("store: forwarding request")
 		s.stub.SendTo(target.Store, forward)
+	}
+}
+
+func (s *Actor) onClose(ctx actor.Context) {
+	ctx.Logger().Info("store: closing")
+	for _, fut := range s.remoteObjects {
+		fut.Reject(errors.New("store: closing"))
+	}
+	if err := s.stub.Close(); err != nil {
+		ctx.Logger().Error("store: error closing stub", "err", err)
 	}
 }
 
@@ -195,24 +199,14 @@ func (s *Actor) Receive(ctx actor.Context) {
 	// forward messages
 	case forwardMessage:
 		s.onForward(ctx, msg)
+	case *actor.Stopped:
+		s.onClose(ctx)
 	}
 }
 
-func New(stub remote.Stub, id string) *actor.Props {
-	s := &Actor{
-		id:            id,
-		stub:          stub,
-		localObjects:  make(map[string]objects.Interface),
-		remoteObjects: make(map[string]utils.Future[objects.Interface]),
-	}
-	return actor.PropsFromProducer(func() actor.Actor {
-		return s
-	}, actor.WithOnInit(func(ctx actor.Context) {
-		s.ref = &proto.StoreRef{ID: id, PID: ctx.Self()}
-	}))
-}
+func Spawn(ctx *actor.RootContext, spawnStub remote.StubSpawnFunc, id string) *proto.StoreRef {
+	stub := spawnStub(ctx)
 
-func Spawn(ctx *actor.RootContext, stub remote.Stub, id string) *proto.StoreRef {
 	s := &Actor{
 		id:            id,
 		stub:          stub,
@@ -222,12 +216,20 @@ func Spawn(ctx *actor.RootContext, stub remote.Stub, id string) *proto.StoreRef 
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return s
 	})
+
 	pid, _ := ctx.SpawnNamed(props, "store."+id)
 	ref := &proto.StoreRef{
 		ID:  id,
 		PID: pid,
 	}
 	s.ref = ref
+
+	go func() {
+		for msg := range stub.RecvChan() {
+			ctx.Send(pid, msg.Unwrap())
+		}
+	}()
+
 	return ref
 }
 
@@ -240,28 +242,22 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 		return fut
 	}
 
-	props := actor.PropsFromFunc(func(c actor.Context) {
-		switch msg := c.Message().(type) {
-		case *ObjectResponse:
-			if msg.Error != nil {
-				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ID))
+	ctx.Send(store, &RequestObject{
+		Flow: flow,
+		Callback: func(ctx actor.Context, obj objects.Interface, err error) {
+			if err != nil {
+				fut.Reject(errors.WrapWith(err, "flow %s fetch failed", flow.ID))
 				return
 			}
 
-			if msg.Value.GetID() != flow.ID {
-				err := errors.Format("flow %s received unexpected ID %s", flow.ID, msg.Value.GetID())
+			if obj.GetID() != flow.ID {
+				err := errors.Format("flow %s received unexpected ID %s", flow.ID, obj.GetID())
 				fut.Reject(err)
 				return
 			}
 
-			fut.Resolve(msg.Value)
-		}
-	})
-
-	flowActor := ctx.Spawn(props)
-	ctx.Send(store, &RequestObject{
-		ReplyTo: flowActor,
-		Flow:    flow,
+			fut.Resolve(obj)
+		},
 	})
 
 	return fut

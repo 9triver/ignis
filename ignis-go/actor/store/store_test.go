@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,42 +13,38 @@ import (
 	"github.com/9triver/ignis/proto"
 )
 
+func callback(ctx actor.Context, obj objects.Interface, err error) {
+	go func() {
+		if err != nil {
+			fmt.Printf("failed to fetch %v: %v\n", "stream-1", err)
+			return
+		}
+		if stream, ok := obj.(*objects.Stream); ok {
+			for i := range stream.ToChan() {
+				fmt.Printf("received chunk %v\n", i)
+			}
+		} else {
+			fmt.Printf("received %v\n", obj)
+		}
+	}()
+}
+
 func TestSingleStore(t *testing.T) {
 	sys := actor.NewActorSystem()
-	s := stub.NewActorStub(sys)
-	props := New(s, "store")
-
-	store := sys.Root.Spawn(props)
-	defer sys.Root.Stop(store)
+	store := Spawn(sys.Root, stub.NewActorStub, "store")
 
 	ctx := sys.Root
-	listen := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
-		switch msg := c.Message().(type) {
-		case *ObjectResponse:
-			obj := msg.Value
-			if stream, ok := obj.(*objects.Stream); ok {
-				for i := range stream.ToChan() {
-					t.Logf("received %v", i)
-				}
-			} else {
-				t.Logf("received %v", obj)
-			}
-		}
-	}))
 
-	ctx.Send(store, &SaveObject{
+	ctx.Send(store.PID, &SaveObject{
 		Value: objects.LocalWithID("obj-1", 10, objects.LangJson),
 	})
 
-	ctx.Send(store, &RequestObject{
-		ReplyTo: listen,
+	ctx.Send(store.PID, &RequestObject{
 		Flow: &proto.Flow{
-			ID: "obj-1",
-			Source: &proto.StoreRef{
-				ID:  "store",
-				PID: store,
-			},
+			ID:     "obj-1",
+			Source: store,
 		},
+		Callback: callback,
 	})
 
 	ints := make(chan int)
@@ -57,23 +54,19 @@ func TestSingleStore(t *testing.T) {
 			ints <- i
 		}
 	}()
-	ctx.Send(store, &SaveObject{
-		Value:    objects.StreamWithID("stream-1", ints, objects.LangJson),
-		Callback: nil,
+	ctx.Send(store.PID, &SaveObject{
+		Value: objects.StreamWithID("stream-1", ints, objects.LangJson),
 	})
 
-	ctx.Send(store, &RequestObject{
-		ReplyTo: listen,
+	ctx.Send(store.PID, &RequestObject{
 		Flow: &proto.Flow{
-			ID: "stream-1",
-			Source: &proto.StoreRef{
-				ID:  "store",
-				PID: store,
-			},
+			ID:     "stream-1",
+			Source: store,
 		},
+		Callback: callback,
 	})
 
-	<-time.After(10 * time.Second)
+	<-time.After(120 * time.Second)
 }
 
 func TestMultipleStores(t *testing.T) {
@@ -87,16 +80,13 @@ func TestMultipleStores(t *testing.T) {
 	remote2 := ar.NewRemote(sys2, ar.Configure("127.0.0.1", 3001))
 	remote2.Start()
 
-	stub1 := stub.NewActorStub(sys1)
-	stub2 := stub.NewActorStub(sys2)
+	store1 := Spawn(ctx1, stub.NewActorStub, "store1")
+	store2 := Spawn(ctx2, stub.NewActorStub, "store2")
 
-	store1 := sys1.Root.Spawn(New(stub1, "store1"))
-	defer sys1.Root.Stop(store1)
+	defer ctx1.Stop(store1.PID)
+	defer ctx2.Stop(store2.PID)
 
-	store2 := sys2.Root.Spawn(New(stub2, "store2"))
-	defer sys2.Root.Stop(store2)
-
-	ctx1.Send(store1, &SaveObject{
+	ctx1.Send(store1.PID, &SaveObject{
 		Value: objects.LocalWithID("obj-1", 10, objects.LangJson),
 	})
 
@@ -107,46 +97,25 @@ func TestMultipleStores(t *testing.T) {
 			ints <- i
 		}
 	}()
-	ctx1.Send(store1, &SaveObject{
-		Value:    objects.StreamWithID("stream-1", ints, objects.LangJson),
-		Callback: nil,
+	ctx1.Send(store1.PID, &SaveObject{
+		Value: objects.StreamWithID("stream-1", ints, objects.LangJson),
 	})
 
-	listen := ctx2.Spawn(actor.PropsFromFunc(func(c actor.Context) {
-		switch msg := c.Message().(type) {
-		case *ObjectResponse:
-			obj := msg.Value
-			if stream, ok := obj.(*objects.Stream); ok {
-				for i := range stream.ToChan() {
-					t.Logf("received chunk %v", i)
-				}
-			} else {
-				t.Logf("received %v", obj)
-			}
-		}
-	}))
-
-	ctx2.Send(store2, &RequestObject{
-		ReplyTo: listen,
+	ctx2.Send(store2.PID, &RequestObject{
 		Flow: &proto.Flow{
-			ID: "obj-1",
-			Source: &proto.StoreRef{
-				ID:  "store1",
-				PID: store1,
-			},
+			ID:     "obj-1",
+			Source: store1,
 		},
+		Callback: callback,
 	})
 
-	ctx2.Send(store2, &RequestObject{
-		ReplyTo: listen,
+	ctx2.Send(store2.PID, &RequestObject{
 		Flow: &proto.Flow{
-			ID: "stream-1",
-			Source: &proto.StoreRef{
-				ID:  "store1",
-				PID: store1,
-			},
+			ID:     "stream-1",
+			Source: store1,
 		},
+		Callback: callback,
 	})
 
-	<-time.After(10 * time.Second)
+	<-time.After(120 * time.Second)
 }

@@ -21,8 +21,8 @@ type SaveObject struct {
 
 // RequestObject is sent to store by **local** actors
 type RequestObject struct {
-	ReplyTo *actor.PID
-	Flow    *proto.Flow
+	Flow     *proto.Flow
+	Callback func(ctx actor.Context, obj objects.Interface, err error)
 }
 
 // ObjectResponse is sent to request actor
