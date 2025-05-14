@@ -1,7 +1,9 @@
 package objects
 
 import (
+	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/9triver/ignis/configs"
@@ -65,10 +67,12 @@ func (s *Stream) doStart() {
 
 	for obj := range s.values {
 		s.mu.RLock()
-		for _, ch := range s.consumers {
+		consumersCopy := slices.Clone(s.consumers)
+		s.mu.RUnlock()
+
+		for _, ch := range consumersCopy {
 			ch <- obj
 		}
-		s.mu.RUnlock()
 	}
 }
 
@@ -102,6 +106,7 @@ func StreamWithID(id string, values any, language Language) *Stream {
 	go func() {
 		defer s.EnqueueChunk(nil)
 		ch := reflect.ValueOf(values)
+		chunks := 0
 		for {
 			v, ok := ch.Recv()
 			if !ok {
@@ -111,8 +116,9 @@ func StreamWithID(id string, values any, language Language) *Stream {
 			if obj, ok := v.Interface().(Interface); ok {
 				s.EnqueueChunk(obj)
 			} else {
-				s.EnqueueChunk(NewLocal(v.Interface(), language))
+				s.EnqueueChunk(LocalWithID(fmt.Sprintf("%s.%d", id, chunks), v.Interface(), language))
 			}
+			chunks++
 		}
 	}()
 
