@@ -1,14 +1,14 @@
 package utils
 
 import (
-	"github.com/asynkron/protoactor-go/actor"
-	"github.com/lmittmann/tint"
 	"io"
 	"log/slog"
 	"os"
 	"time"
 
+	"github.com/asynkron/protoactor-go/actor"
 	"github.com/lithammer/shortuuid/v4"
+	"github.com/lmittmann/tint"
 )
 
 func WithLogger(logPaths ...string) actor.ConfigOption {
