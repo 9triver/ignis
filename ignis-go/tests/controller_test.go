@@ -23,7 +23,7 @@ func TestController(t *testing.T) {
 	sys := actor.NewActorSystem()
 	remoter := remote.NewRemote(sys, remote.Configure("127.0.0.1", 3001))
 	remoter.Start()
-	storeRef := store.Spawn(sys.Root, stub.NewActorStub(sys), "store")
+	storeRef := store.Spawn(sys.Root, stub.NewActorStub, "store")
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 1000*time.Second)
 	defer cancel()

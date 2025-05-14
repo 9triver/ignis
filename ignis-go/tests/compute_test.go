@@ -79,13 +79,13 @@ func rpcClient(computeRef *proto.ActorRef) {
 }
 
 func TestRemoteTask(t *testing.T) {
-	sys := actor.NewActorSystem(utils.WithLogger("task.log"))
+	sys := actor.NewActorSystem(utils.WithLogger())
 	cm := rpc.NewManager("127.0.0.1:8082")
 	em := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
 	ctx, cancel := context.WithTimeout(context.TODO(), 120*time.Second)
 	defer cancel()
 
-	storeRef := store.Spawn(sys.Root, stub.NewActorStub(sys), "store")
+	storeRef := store.Spawn(sys.Root, stub.NewActorStub, "store")
 	type Input struct {
 		A int
 		B int
