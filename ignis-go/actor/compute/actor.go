@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"strings"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -20,7 +21,8 @@ type Actor struct {
 
 func (a *Actor) newSession(ctx actor.Context, sessionId string) *actor.PID {
 	ctx.Logger().Info("compute: create session", "actor", a.name, "session", sessionId)
-	props := NewSession(sessionId, a.store, a.executor)
+	name := strings.ReplaceAll(a.name, "-", ".")
+	props := NewSession(sessionId, a.store, a.executor, name)
 	session, _ := ctx.SpawnNamed(props, "session."+sessionId)
 	a.sessions[sessionId] = session
 	return session

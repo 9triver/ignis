@@ -1,11 +1,13 @@
 package compute
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/draw"
 	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
@@ -13,6 +15,7 @@ import (
 
 type Session struct {
 	id       string
+	name     string
 	store    *actor.PID
 	executor *Executor
 	params   map[string]objects.Interface
@@ -39,6 +42,10 @@ func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
 	s.link += invoke.Link
 	if s.deps.Empty() && s.start != nil {
 		s.doInvoke(ctx)
+	}
+
+	if err := draw.SendMessage(s.name, "to"); err != nil {
+		fmt.Println("Error sending message:", err)
 	}
 }
 
@@ -81,6 +88,11 @@ func (s *Session) onComplete(ctx actor.Context, obj objects.Interface, duration 
 			})
 		},
 	}
+
+	if err := draw.SendMessage(s.name, "from"); err != nil {
+		fmt.Println("Error sending message:", err)
+	}
+
 	ctx.Send(s.store, save)
 }
 
@@ -116,6 +128,7 @@ func NewSession(
 	id string,
 	store *actor.PID,
 	executor *Executor,
+	name string,
 ) *actor.Props {
 	return actor.PropsFromProducer(func() actor.Actor {
 		return &Session{
@@ -124,6 +137,7 @@ func NewSession(
 			executor: executor,
 			params:   make(map[string]objects.Interface),
 			deps:     utils.MakeSetFromSlice(executor.Deps()),
+			name:     name,
 		}
 	})
 }
