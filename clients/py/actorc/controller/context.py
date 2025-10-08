@@ -26,13 +26,13 @@ class ActorContext:
         global actorContext
         if actorContext is None:
             if master_address is None:
-                master_address = os.getenv("IGNIS_MASTER_ADDRESS", "localhost:50051")
+                master_address = os.getenv("IGNIS_ADDR", "localhost:50051")
             actorContext = ActorContext(master_address)
         return actorContext
 
     def __init__(self, master_address: str = None):
         if master_address is None:
-            master_address = os.getenv("IGNIS_MASTER_ADDRESS", "localhost:50051")
+            master_address = os.getenv("IGNIS_ADDR", "localhost:50051")
         self._master_address = master_address
         self._channel = grpc.insecure_channel(
             master_address,

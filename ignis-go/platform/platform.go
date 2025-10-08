@@ -44,7 +44,19 @@ func (p *Platform) Run() error {
 	return ctx.Err()
 }
 
-func NewPlatform(ctx context.Context) *Platform {
+func NewPlatform(ctx context.Context, cfg *configs.Config) *Platform {
+	opt := utils.WithLogger()
+	ipcAddr := "ipc://" + path.Join(configs.StoragePath, "em-ipc")
+
+	return &Platform{
+		ctx: ctx,
+		sys: actor.NewActorSystem(opt),
+		cm:  rpc.NewManager(cfg.RpcAddr),
+		em:  ipc.NewManager(ipcAddr),
+	}
+}
+
+func NewMasterPlatform(ctx context.Context) *Platform {
 	opt := utils.WithLogger()
 	rpcAddr := "127.0.0.1:8080"
 	ipcAddr := "ipc://" + path.Join(configs.StoragePath, "em-ipc")
