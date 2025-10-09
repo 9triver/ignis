@@ -1,4 +1,4 @@
-from lucas import Runtime, Function
+from lucas import Runtime, Function, ActorClass, ActorConfig
 from lucas.serverless_function import Metadata
 from lucas.workflow.executor import Executor
 from lucas.workflow.dag import DAGNode, DataNode, ControlNode
@@ -31,7 +31,7 @@ class ActorContext:
         self._master_address = master_address
         self._channel = grpc.insecure_channel(
             master_address,
-            options=[("grpc.max_receive_message_length", 512 * 1024 * 1024)],
+            options=[("grpc.max_receive_message_length", 2 * 1024 * 1024 * 1024 - 1)],
         )
         self._stub = controller_pb2_grpc.ServiceStub(self._channel)
         self._q = queue.Queue()
@@ -132,6 +132,36 @@ class ActorFunction(Function):
     def _transformfunction(self, fn):
         return fn
 
+
+class ActorRuntimeClass(ActorClass):
+    def onClassInit(self):
+        dependcy = self._config.dependency
+        class_name = self._config.name
+        venv = self._config.venv
+        try:
+            replicas = self._config.replicas
+        except AttributeError:
+            replicas = 1
+        sig = inspect.signature(self._cls.__call__)
+        params = []
+        for name, param in sig.parameters.items():
+            if name == 'self':
+                continue
+            params.append(name)
+        print("pickle class here")
+        obj = cloudpickle.dumps(self._instance)
+        message = controller_pb2.Message(
+            Type=controller_pb2.CommandType.FR_APPEND_PY_FUNC,
+            AppendPyFunc=controller_pb2.AppendPyFunc(
+                Name=class_name,
+                Params=params,
+                Venv=venv,
+                Requirements=dependcy,
+                PickledObject=obj,
+                Language=platform_pb2.LANG_PYTHON,
+            ),
+        )
+        actorContext.send(message)
 
 class ActorExecutor(Executor):
     def __init__(self, dag):

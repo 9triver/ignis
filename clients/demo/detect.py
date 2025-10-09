@@ -128,6 +128,7 @@ context = ActorContext.createContext("localhost:8082")
     provider="actor",
     name="read_image",
     venv="test2",
+    replicas=4,
 )
 def read_image(path: str):
     im = cv2.imread(path)
@@ -174,7 +175,7 @@ def paint(image: np.ndarray, result: dict):
             (0, 255, 0),
             2,
         )
-    cv2.imwrite(f"/home/iori/workspace/ignis/result.jpg", image)
+    cv2.imwrite(f"/home/spark4862/Documents/projects/go/ignis/result.jpg", image)
     return image
 
 
@@ -223,7 +224,7 @@ def actorWorkflowExportFunc(dict: dict):
 
 detect = workflowfunc.export(actorWorkflowExportFunc)
 # print("----first execute----")
-img_dir = "/home/iori/workspace/ignis/clients/demo/images"
+img_dir = "/home/spark4862/Documents/projects/go/ignis/clients/demo/images"
 for file in os.listdir(img_dir):
     if file.endswith(".jpg"):
         detect({"path": os.path.join(img_dir, file)})

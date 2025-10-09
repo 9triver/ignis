@@ -25,7 +25,7 @@ import gc
 context = ActorContext.createContext("localhost:8082")
 
 PROMPT = "你是一个医学专家，你需要根据用户的问题，给出带有思考的回答。"
-MAX_LENGTH = 600
+MAX_LENGTH = 200
 
 train_jsonl_new_path = "/home/spark4862/Documents/projects/go/ignis/clients/demo/datasets"
 lora_path = "/home/spark4862/Documents/projects/go/ignis/clients/demo/lora_adapter_checkpoint"
@@ -70,6 +70,84 @@ def read_data(path: str):
     return train_dataset
 
 
+# args = TrainingArguments(
+#     # output_dir="/home/spark4862/Documents/projects/go/ignis/clients/demo/output/Qwen3-0.6B",
+#     per_device_train_batch_size=1,
+#     gradient_accumulation_steps=4,
+#     eval_strategy="no",
+#     logging_steps=1, # logging可以保留，用于观察loss
+#     save_steps=100000, # 防止Trainer自动保存
+#     learning_rate=1e-2,
+#     save_on_each_node=True,
+#     gradient_checkpointing=True,
+#     run_name="qwen3-0.6B-manual-loop",
+#     optim="paged_adamw_8bit",
+# )
+
+# dc = DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True, pad_to_multiple_of=8)
+
+# bnb_config = BitsAndBytesConfig(
+#     load_in_4bit=True,  # 启用4-bit量化
+#     bnb_4bit_quant_type="nf4",  # 设置量化类型，"nf4"是推荐的默认值
+#     bnb_4bit_compute_dtype=torch.bfloat16,  # 设置计算时的数据类型，以保持精度和速度
+#     bnb_4bit_use_double_quant=True,  # 启用双重量化，进一步节省显存
+# )
+
+# lora_config = LoraConfig(
+#     r=4,
+#     lora_alpha=8,
+#     target_modules="all-linear",
+#     lora_dropout=0.05,
+#     bias="none",
+#     task_type="CAUSAL_LM",
+# )
+
+
+# print("--- Loading model ---")
+# # global model
+# model1 = AutoModelForCausalLM.from_pretrained(
+#     "Qwen/Qwen3-0.6B", 
+#     device_map="auto", 
+#     torch_dtype=torch.float16, 
+#     quantization_config=bnb_config,
+#     attn_implementation="flash_attention_2"
+# )
+# model1 = prepare_model_for_kbit_training(model1)
+# if not os.path.exists(lora_path):
+#     model1 = get_peft_model(model1, lora_config)
+# else:
+#     print("test2", file=sys.stderr)
+#     model1 = PeftModel.from_pretrained(model1, lora_path)
+# model1.gradient_checkpointing_enable() # type: ignore
+# model1.enable_input_require_grads() # type: ignore
+
+
+
+# @function(
+#     wrapper=ActorFunction,
+#     dependency=[],
+#     provider="actor",
+#     name="train",
+#     venv="test2",
+# ) # type: ignore
+# def train(ds: Dataset):
+#     global model1, args, dc
+
+#     trainer = Trainer(
+#         model=model1,
+#         args=args,
+#         train_dataset=ds,
+#         data_collator=dc,
+#     )
+#     trainer.train()
+#     model1.save_pretrained(lora_path)
+#     return "test"
+
+model1 = None
+args = None
+dc = None
+inited = False
+
 @function(
     wrapper=ActorFunction,
     dependency=[],
@@ -78,61 +156,66 @@ def read_data(path: str):
     venv="test2",
 ) # type: ignore
 def train(ds: Dataset):
-    # tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B", use_fast=False, trust_remote_code=True)
-    # tokenizer.padding_side = 'left'
-    # global tokenizer
+    def initOnce():
+        global model1, args, dc, inited
+        if inited:
+            return
+        inited = True
+        args = TrainingArguments(
+            # output_dir="/home/spark4862/Documents/projects/go/ignis/clients/demo/output/Qwen3-0.6B",
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=4,
+            eval_strategy="no",
+            logging_steps=1, # logging可以保留，用于观察loss
+            save_steps=100000, # 防止Trainer自动保存
+            learning_rate=1e-2,
+            save_on_each_node=True,
+            gradient_checkpointing=True,
+            run_name="qwen3-0.6B-manual-loop",
+            optim="paged_adamw_8bit",
+        )
 
-    args = TrainingArguments(
-        # output_dir="/home/spark4862/Documents/projects/go/ignis/clients/demo/output/Qwen3-0.6B",
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
-        eval_strategy="no",
-        logging_steps=1, # logging可以保留，用于观察loss
-        save_steps=100000, # 防止Trainer自动保存
-        learning_rate=1e-2,
-        save_on_each_node=True,
-        gradient_checkpointing=True,
-        run_name="qwen3-0.6B-manual-loop",
-        optim="paged_adamw_8bit",
-    )
+        dc = DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True, pad_to_multiple_of=8)
 
-    dc = DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True, pad_to_multiple_of=8)
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,  # 启用4-bit量化
+            bnb_4bit_quant_type="nf4",  # 设置量化类型，"nf4"是推荐的默认值
+            bnb_4bit_compute_dtype=torch.bfloat16,  # 设置计算时的数据类型，以保持精度和速度
+            bnb_4bit_use_double_quant=True,  # 启用双重量化，进一步节省显存
+        )
 
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,  # 启用4-bit量化
-        bnb_4bit_quant_type="nf4",  # 设置量化类型，"nf4"是推荐的默认值
-        bnb_4bit_compute_dtype=torch.bfloat16,  # 设置计算时的数据类型，以保持精度和速度
-        bnb_4bit_use_double_quant=True,  # 启用双重量化，进一步节省显存
-    )
-
-    lora_config = LoraConfig(
-        r=8,
-        lora_alpha=16,
-        target_modules="all-linear",
-        lora_dropout=0.05,
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
+        lora_config = LoraConfig(
+            r=4,
+            lora_alpha=8,
+            target_modules="all-linear",
+            lora_dropout=0.05,
+            bias="none",
+            task_type="CAUSAL_LM",
+        )
 
 
-    print("--- Loading model ---")
-    # global model
-    model1 = AutoModelForCausalLM.from_pretrained(
-        "Qwen/Qwen3-0.6B", 
-        device_map="auto", 
-        torch_dtype=torch.float16, 
-        quantization_config=bnb_config,
-        attn_implementation="flash_attention_2"
-    )
-    model1 = prepare_model_for_kbit_training(model1)
-    if not os.path.exists(lora_path):
-        model1 = get_peft_model(model1, lora_config)
-    else:
-        print("test2", file=sys.stderr)
-        model1 = PeftModel.from_pretrained(model1, lora_path)
-    model1.gradient_checkpointing_enable() # type: ignore
-    model1.enable_input_require_grads() # type: ignore
+        print("--- Loading model ---")
+        # global model
+        model1 = AutoModelForCausalLM.from_pretrained(
+            "Qwen/Qwen3-0.6B", 
+            device_map="auto", 
+            torch_dtype=torch.float16, 
+            quantization_config=bnb_config,
+            attn_implementation="flash_attention_2"
+        )
+        model1 = prepare_model_for_kbit_training(model1)
+        if not os.path.exists(lora_path):
+            model1 = get_peft_model(model1, lora_config)
+        else:
+            print("test2", file=sys.stderr)
+            model1 = PeftModel.from_pretrained(model1, lora_path)
+        model1.gradient_checkpointing_enable() # type: ignore
+        model1.enable_input_require_grads() # type: ignore
 
+    initOnce()
+
+    print("test train 1")
+    
     trainer = Trainer(
         model=model1,
         args=args,
@@ -141,14 +224,11 @@ def train(ds: Dataset):
     )
     trainer.train()
     model1.save_pretrained(lora_path)
-
-    model1.cpu()
-    del model1
-    del trainer
-    gc.collect()
-    torch.cuda.synchronize()
-    torch.cuda.empty_cache()
     return "test"
+
+
+        
+#     return "test"
 
 def predict(path: str):
     # tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B", use_fast=False, trust_remote_code=True)
@@ -260,11 +340,11 @@ def actorWorkflowExportFunc(dict: dict):
 
 workflow_func = workflowfunc.export(actorWorkflowExportFunc)
 print("----first execute----")
-data_dir = "/home/spark4862/Documents/projects/go/ignis/clients/demo/datasets/"
+data_dir = "/home/spark4862/Documents/projects/go/ignis/clients/demo/.bak/"
 
-predict("/home/spark4862/Documents/projects/go/ignis/clients/demo/datasets/medical41.jsonl")
+# predict("/home/spark4862/Documents/projects/go/ignis/clients/demo/datasets/medical41.jsonl")
 
 for file in os.listdir(data_dir):
     workflow_func({"path": os.path.join(data_dir, file)})
 
-predict("/home/spark4862/Documents/projects/go/ignis/clients/demo/datasets/medical41.jsonl")
+# predict("/home/spark4862/Documents/projects/go/ignis/clients/demo/datasets/medical41.jsonl")

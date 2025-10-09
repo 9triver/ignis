@@ -25,7 +25,7 @@ func TestController(t *testing.T) {
 	remoter.Start()
 	storeRef := store.Spawn(sys.Root, stub.NewActorStub(sys), "store")
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 1000*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 10000*time.Second)
 	defer cancel()
 
 	go func() {

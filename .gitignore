@@ -4,3 +4,7 @@ bak/
 venv/
 __pycache__/
 *.exe
+
+*.xhy.md
+*.bak
+*.bak/

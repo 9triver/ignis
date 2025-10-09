@@ -19,7 +19,7 @@ const (
 	venvStorageName = "actor-platform"
 	venvMetadata    = ".envs.json"
 	venvStart       = "__actor_executor.py"
-	pythonExec      = "python3"
+	pythonExec      = "/home/spark4862/anaconda3/envs/demo/bin/python"
 )
 
 var venvPath = func() string {
@@ -28,7 +28,7 @@ var venvPath = func() string {
 		panic(err)
 	}
 	dir := path.Join(home, venvStorageName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		panic(err)
 	}
 	return dir
@@ -65,17 +65,17 @@ func (m *VenvManager) template() (string, bool) {
 func (m *VenvManager) createEnv(name string) (*VirtualEnv, error) {
 	venvPath := path.Join(venvPath, name)
 
-	if err := os.MkdirAll(venvPath, 0755); err != nil {
+	if err := os.MkdirAll(venvPath, 0o755); err != nil {
 		return nil, errors.WrapWith(err, "venv %s: path creation failed", name)
 	}
 
-	if err := exec.Command("python3", "-m", "venv", venvPath).Run(); err != nil {
+	if err := exec.Command(pythonExec, "-m", "venv", venvPath).Run(); err != nil {
 		return nil, errors.WrapWith(err, "venv %s: venv creation failed", name)
 	}
 
 	if template, ok := m.template(); !ok {
 		return nil, errors.Format("venv %s: no template is found for python", name)
-	} else if err := os.WriteFile(path.Join(venvPath, venvStart), []byte(template), 0644); err != nil {
+	} else if err := os.WriteFile(path.Join(venvPath, venvStart), []byte(template), 0o644); err != nil {
 		return nil, errors.WrapWith(err, "venv %s: template creation failed", name)
 	}
 

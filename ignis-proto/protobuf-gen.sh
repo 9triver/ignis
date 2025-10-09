@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROTOC="python -m grpc_tools.protoc"
+PROTOC="python3 -m grpc_tools.protoc"
 export PATH="$PATH:$HOME/go/bin"
 
 ACTOR_SRC=$(go list -f {{.Dir}} github.com/asynkron/protoactor-go/actor)

@@ -124,3 +124,13 @@ def actorWorkflowExportFunc(dict: dict):
 workflow_func = workflowfunc.export(actorWorkflowExportFunc)
 print("----first execute----")
 workflow_func({"dataset": "wikitext", "name": "wikitext-2-raw-v1"})
+
+'''
+model = ...
+predict(model, text)
+for i in range(batch_num):
+    batch = read_data(i)
+    model = train(model, batch)
+predict(model, text)
+
+'''

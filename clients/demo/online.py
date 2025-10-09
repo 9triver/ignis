@@ -18,6 +18,7 @@ from river import metrics
 from river import compose
 from river import preprocessing
 from river import evaluate
+import time
 
 context = ActorContext.createContext("localhost:8082")
 
@@ -53,6 +54,7 @@ def get_data(_in):
     venv="test2",
 )
 def evaluate_data(dataset):
+    time.sleep(2)
     model = compose.Pipeline(
         preprocessing.StandardScaler(), linear_model.LogisticRegression()
     )
@@ -78,7 +80,7 @@ def evaluate_data(dataset):
     venv="test2",
 )
 def store_data(metrics, storage_path):
-
+    time.sleep(2)
     print(metrics, file=sys.stderr)
     with open(storage_path, "w") as f:
         f.write(str(metrics))

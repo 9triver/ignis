@@ -92,7 +92,5 @@ func NewManager(addr string) *ConnectionManager {
 	}
 }
 
-var (
-	//go:embed executor_template.py
-	PythonExecutorTemplate string
-)
+//go:embed executor_template.py
+var PythonExecutorTemplate string
