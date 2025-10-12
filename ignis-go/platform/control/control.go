@@ -82,6 +82,42 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 	c.nodes[f.Name] = node
 }
 
+func (c *Controller) onAppendPyClass(ctx actor.Context, obj *controller.AppendPyClass) {
+	ctx.Logger().Info("control: append python class object",
+		"name", obj.Name,
+		"methods", obj.Methods,
+	)
+
+	var methods []string
+	var params [][]string
+
+	for _, method := range obj.Methods {
+		methods = append(methods, method.Name)
+		params = append(params, method.Params)
+	}
+
+	pyMethods, err := functions.NewPyClass(c.manager, obj.Name, methods, params, obj.Venv, obj.Requirements, obj.PickledObject, obj.Language)
+	if err != nil {
+		return
+	}
+
+	for _, method := range pyMethods {
+		name := fmt.Sprintf("%s.%s", obj.Name, method.Name)
+		group := task.NewGroup(name)
+		c.groups[name] = group
+		props := compute.NewActor(name, method, c.store.PID)
+		pid := ctx.Spawn(props)
+		info := &proto.ActorInfo{
+			Ref: &proto.ActorRef{
+				ID:    name,
+				PID:   pid,
+				Store: c.store,
+			},
+		}
+		group.Push(info)
+	}
+}
+
 func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData) {
 	obj := data.Object
 	ctx.Logger().Info("control: append data node",

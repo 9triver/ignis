@@ -1,6 +1,7 @@
 package functions
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -51,6 +52,39 @@ func ImplPy(
 		venv:     env,
 		language: language,
 	}, nil
+}
+
+func NewPyClass(
+	manager *VenvManager,
+	objName string,
+	methods []string,
+	params [][]string,
+	venv string,
+	packages []string,
+	pickledObj []byte,
+	language proto.Language,
+) ([]*PyFunction, error) {
+	env, err := manager.GetVenv(venv, packages...)
+	if err != nil {
+		return nil, errors.WrapWith(err, "%s: error creating impl", objName)
+	}
+
+	addHandler := executor.NewAddHandler(venv, objName, pickledObj, language, methods)
+	env.Send(addHandler)
+
+	var functions []*PyFunction
+	for i, method := range methods {
+		functions = append(functions, &PyFunction{
+			FuncDec: FuncDec{
+				name:   fmt.Sprintf("%s.%s", objName, method),
+				params: params[i],
+			},
+			venv:     env,
+			language: language,
+		})
+	}
+
+	return functions, nil
 }
 
 func (f *PyFunction) Call(params map[string]objects.Interface) (objects.Interface, error) {

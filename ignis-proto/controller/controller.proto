@@ -58,6 +58,23 @@ message AppendPyFunc {
   int32 Replicas = 7;
 }
 
+
+message AppendPyClass {
+  message ClassMethod {
+    string Name = 1;
+    repeated string Params = 2;
+  }
+
+  string Name = 1; // class name
+  repeated ClassMethod Methods = 2;
+  string Venv = 3; // function virtual environment
+  repeated string Requirements = 4; // function dependencies
+  bytes PickledObject = 5; // encoded function impl
+  proto.Language Language = 6; // return type of function
+  // TODO: Resources
+  int32 Replicas = 7;
+}
+
 message AppendArg {
   string SessionID = 1; // current execution session
   string InstanceID = 2; // id of function instance under current execution session
@@ -84,8 +101,9 @@ message Message {
     AppendData AppendData = 4;
     AppendActor AppendActor = 5;
     AppendPyFunc AppendPyFunc = 6;
-    AppendArg AppendArg = 7;
-    ReturnResult ReturnResult = 8;
+    AppendPyClass AppendPyClass = 7;
+    AppendArg AppendArg = 8;
+    ReturnResult ReturnResult = 9;
   }
 }
 
