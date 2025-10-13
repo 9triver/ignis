@@ -11,8 +11,10 @@ enum CommandType {
   FR_APPEND_DATA = 3; // frontend: append data node
   FR_APPEND_ACTOR = 4; // front: append actor (for debugging purpose)
   FR_APPEND_PY_FUNC = 5; // frontend: append python function (control node definition)
-  FR_APPEND_ARG = 6; // frontend: append function arg to specified actor
-  BK_RETURN_RESULT = 7; // backend: send back execution result
+  FR_APPEND_PY_CLASS = 6; // frontend: append python class (control node definition)
+  FR_APPEND_ARG = 7; // frontend: append function arg to specified actor
+  FR_APPEND_CLASS_METHOD_ARG = 8; // frontend: append class method arg to specified actor
+  BK_RETURN_RESULT = 9; // backend: send back execution result
 }
 
 message Ack {
@@ -83,6 +85,14 @@ message AppendArg {
   Data Value = 5; // object ref for param
 }
 
+message AppendClassMethodArg {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of **class** instance under current execution session
+  string MethodName = 3; // method name
+  string Param = 4; // param name
+  Data Value = 5; // object ref for param
+}
+
 message ReturnResult {
   string SessionID = 1; // current execution session
   string InstanceID = 2; // id of function instance under current execution session
@@ -103,7 +113,8 @@ message Message {
     AppendPyFunc AppendPyFunc = 6;
     AppendPyClass AppendPyClass = 7;
     AppendArg AppendArg = 8;
-    ReturnResult ReturnResult = 9;
+    AppendClassMethodArg AppendClassMethodArg = 9;
+    ReturnResult ReturnResult = 10;
   }
 }
 
