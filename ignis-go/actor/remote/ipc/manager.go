@@ -42,6 +42,14 @@ func (cm *ConnectionManager) onReceive(router *goczmq.Channeler, frame []byte, m
 	}
 }
 
+func (cm *ConnectionManager) Start(ctx context.Context) error {
+	var err error
+	go func() {
+		err = cm.Run(ctx)
+	}()
+	return err
+}
+
 func (cm *ConnectionManager) Run(ctx context.Context) error {
 	router := goczmq.NewRouterChanneler(cm.addr)
 	defer router.Destroy()

@@ -7,9 +7,11 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/9triver/ignis/actor/remote"
+	"github.com/9triver/ignis/proto/cluster"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/proto/executor"
 	"github.com/9triver/ignis/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type controllerService struct {
@@ -102,6 +104,56 @@ func (es *executorService) newConn(ctx context.Context, conn string) remote.Exec
 
 func (es *executorService) close() {
 	for _, c := range es.executors {
+		_ = c.Close()
+	}
+}
+
+type computeService struct {
+	cluster.UnimplementedServiceServer
+	computers map[string]*remote.ComputeStreamImpl
+}
+
+func (cps *computeService) Session(stream grpc.BidiStreamingServer[cluster.Message, cluster.Message]) error {
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		cps.onReceive(stream, msg)
+	}
+}
+
+func (cps *computeService) onReceive(stream grpc.BidiStreamingServer[cluster.Message, cluster.Message], msg *cluster.Message) {
+	c, ok := cps.computers[msg.ConnID]
+	if !ok {
+		logrus.Errorf("compute session %s not found", msg.ConnID)
+		return
+	}
+
+	switch msg.Message.(type) {
+	case *cluster.Message_Ready:
+		c.SetSender(stream.Send)
+	default:
+		c.Produce(msg)
+	}
+}
+
+func (cps *computeService) newConn(ctx context.Context, connId string) *remote.ComputeStreamImpl {
+	if c, ok := cps.computers[connId]; ok {
+		return c
+	}
+
+	c := remote.NewComputeStreamImpl(connId, remote.RPC)
+	go c.Run(ctx)
+	cps.computers[connId] = c
+	return c
+}
+
+func (cs *computeService) close() {
+	for _, c := range cs.computers {
 		_ = c.Close()
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 type Handler interface {
 	SessionID() string
-	Start(ctx actor.Context, replyTo *proto.ActorRef) error
+	Start(ctx actor.Context, replyTo string) error
 	Invoke(ctx actor.Context, param string, value *proto.Flow) (ready bool, err error)
 }
 

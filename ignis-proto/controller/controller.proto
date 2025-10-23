@@ -13,6 +13,8 @@ enum CommandType {
   FR_APPEND_PY_FUNC = 5; // frontend: append python function (control node definition)
   FR_APPEND_ARG = 6; // frontend: append function arg to specified actor
   BK_RETURN_RESULT = 7; // backend: send back execution result
+  FR_REGISTER_REQUEST = 8; // backend: register application
+  FR_DAG = 9; // frontend: send DAG structure
 }
 
 message Ack {
@@ -47,6 +49,12 @@ message AppendActor {
   proto.ActorRef Ref = 3; // Ref to actor
 }
 
+message Resources {
+  int64 CPU = 1; // CPU cores
+  int64 Memory = 2; // memory in Bytes
+  int64 GPU = 3; // GPU cores
+}
+
 message AppendPyFunc {
   string Name = 1; // function name
   repeated string Params = 2; //function params
@@ -54,8 +62,8 @@ message AppendPyFunc {
   repeated string Requirements = 4; // function dependencies
   bytes PickledObject = 5; // encoded function impl
   proto.Language Language = 6; // return type of function
-  // TODO: Resources
-  int32 Replicas = 7;
+  Resources Resources = 7; // resources required by function
+  int32 Replicas = 8; // number of replicas
 }
 
 message AppendArg {
@@ -76,6 +84,45 @@ message ReturnResult {
   }
 }
 
+message RegisterRequest {
+  string ApplicationID = 1;
+}
+
+// DAG Node Messages
+message ControlNode {
+  string Id = 1;
+  bool Done = 2;
+  string FunctionName = 3;
+  map<string, string> Params = 4; // lambda_id -> parameter_name mapping
+  int32 Current = 5;
+  string DataNode = 6; // id of the output data node
+  repeated string PreDataNodes = 7; // ids of input data nodes
+  string FunctionType = 8; // "remote" or "local"
+}
+
+message DataNode {
+  string Id = 1;
+  bool Done = 2;
+  string Lambda = 3; // lambda id
+  bool Ready = 4;
+  repeated string SufControlNodes = 5; // ids of successor control nodes
+  optional string PreControlNode = 6; // id of predecessor control node (nullable)
+  optional string ParentNode = 7; // id of parent data node (nullable)
+  repeated string ChildNode = 8; // ids of child data nodes
+}
+
+message DAGNode {
+  string Type = 1; // "ControlNode" or "DataNode"
+  oneof Node {
+    ControlNode ControlNode = 2;
+    DataNode DataNode = 3;
+  }
+}
+
+message DAG {
+  repeated DAGNode Nodes = 1;
+}
+
 message Message {
   CommandType Type = 1;
   oneof Command {
@@ -86,6 +133,8 @@ message Message {
     AppendPyFunc AppendPyFunc = 6;
     AppendArg AppendArg = 7;
     ReturnResult ReturnResult = 8;
+    RegisterRequest RegisterRequest = 9;
+    DAG DAG = 10;
   }
 }
 

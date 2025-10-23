@@ -13,7 +13,7 @@ type Node struct {
 	producer HandlerProducer // handler producer of specified task
 }
 
-func (node *Node) Runtime(sessionId string, store *actor.PID, replyTo *proto.ActorRef) *Runtime {
+func (node *Node) Runtime(sessionId string, store *actor.PID, replyTo string) *Runtime {
 	return &Runtime{
 		replyTo: replyTo,
 		handler: node.producer(sessionId, store),
@@ -41,7 +41,7 @@ func NodeFromActorGroup(id string, params []string, group *ActorGroup) *Node {
 }
 
 type Runtime struct {
-	replyTo *proto.ActorRef
+	replyTo string
 	handler Handler
 }
 

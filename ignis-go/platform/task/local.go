@@ -17,7 +17,7 @@ type LocalTaskHandler struct {
 	params    map[string]*proto.Flow
 }
 
-func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
+func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
 	futures := make(map[string]utils.Future[objects.Interface])
 	for param, flow := range h.params {
 		futures[param] = store.GetObject(ctx, h.store, flow)
@@ -81,7 +81,7 @@ type ActorTaskHandler struct {
 	pid *actor.PID
 }
 
-func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
+func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo string) error {
 	ctx.Send(h.pid, &proto.InvokeStart{
 		SessionID: h.sessionId,
 		ReplyTo:   replyTo,

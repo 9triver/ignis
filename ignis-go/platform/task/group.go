@@ -57,10 +57,12 @@ type GroupedTaskHandler struct {
 	selected *ActorInfo
 }
 
-func (h *GroupedTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
+func (h *GroupedTaskHandler) Start(ctx actor.Context, replyTo string) error {
 	if h.selected == nil {
 		return errors.New("no candidate actor selected")
 	}
+
+	ctx.Logger().Debug("task: start grouped task", "actor", h.selected.Ref.ID)
 
 	ctx.Send(h.store, &proto.InvokeStart{
 		Info:      h.selected,
@@ -77,11 +79,14 @@ func (h *GroupedTaskHandler) Invoke(ctx actor.Context, param string, value *prot
 
 	h.deps.Remove(param)
 	ctx.Send(h.store, &proto.Invoke{
-		Target:    h.selected.Ref,
+		Target:    h.selected.Ref.ID,
 		SessionID: h.sessionId,
 		Param:     param,
 		Value:     value,
 	})
+
+	ctx.Logger().Debug("task: invoke grouped task", "deps", h.deps, "ready", h.ready())
+
 	return h.ready(), nil
 }
 

@@ -1,7 +1,5 @@
 package configs
 
-import "context"
-
 // ResourceInfo 表示资源信息
 type ResourceInfo struct {
 	CPU    int64 `json:"cpu"`    // CPU核心数
@@ -17,12 +15,3 @@ type ResourceCapacity struct {
 }
 
 type ResourceProviderMap map[string]*ResourceCapacity
-
-// ResourceProviderFunc 定义获取可用资源的函数类型
-// 返回provider ID到资源容量信息的映射
-type GetResourceProviders func(ctx context.Context) (ResourceProviderMap, error)
-
-type Config struct {
-	RpcAddr              string
-	GetResourceProviders GetResourceProviders
-}

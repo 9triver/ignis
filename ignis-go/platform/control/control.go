@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/sirupsen/logrus"
 
-	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/remote"
+	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
@@ -17,13 +18,18 @@ import (
 )
 
 type Controller struct {
+	id         string
 	manager    *functions.VenvManager
 	controller remote.Controller
 	store      *proto.StoreRef
+	appID      string
+	appInfo    ApplicationInfo
 
 	nodes    map[string]*task.Node
 	groups   map[string]*task.ActorGroup
 	runtimes map[string]*task.Runtime
+
+	deployer task.Deployer
 }
 
 func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
@@ -53,28 +59,32 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 		"params", f.Params,
 	)
 
-	pyFunc, err := functions.NewPy(c.manager, f.Name, f.Params, f.Venv, f.Requirements, f.PickledObject, f.Language)
-	if err != nil {
-		panic(err)
-	}
+	// af, err := c.deployer.DeployPyFunc(context.TODO(), c.appID, f)
+
+	// if err != nil {
+	// 	ctx.Logger().Error("control: deploy python function error",
+	// 		"name", f.Name,
+	// 		"err", err,
+	// 	)
+	// 	return
+	// }
 
 	if f.Replicas == 0 {
 		f.Replicas = 1
 	}
+
+	infos, err := c.deployer.DeployPyFunc(ctx, c.appID, f, c.store)
+	if err != nil {
+		ctx.Logger().Error("control: deploy python function error",
+			"name", f.Name,
+			"err", err,
+		)
+		return
+	}
 	group := task.NewGroup(f.Name)
 	c.groups[f.Name] = group
 
-	for i := range f.Replicas {
-		name := fmt.Sprintf("%s-%d", f.Name, i)
-		props := compute.NewActor(name, pyFunc, c.store.PID)
-		pid := ctx.Spawn(props)
-		info := &proto.ActorInfo{
-			Ref: &proto.ActorRef{
-				ID:    name,
-				PID:   pid,
-				Store: c.store,
-			},
-		}
+	for _, info := range infos {
 		group.Push(info)
 	}
 
@@ -112,11 +122,7 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 			return
 		}
 
-		rt = node.Runtime(sessionId, c.store.PID, &proto.ActorRef{
-			Store: c.store,
-			ID:    "controller",
-			PID:   ctx.Self(),
-		})
+		rt = node.Runtime(sessionId, c.store.PID, c.id)
 		c.runtimes[sessionId] = rt
 	}
 
@@ -152,16 +158,33 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 	}
 }
 
+func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
+	ctx.Logger().Info("control: append DAG",
+		"node num", len(dag.Nodes),
+	)
+	c.appInfo.SetDAG(dag)
+}
+
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
+	// jsonBytes, _ := json.Marshal(msg.Command)
+	// logrus.Info("control: onControllerMessage ", string(jsonBytes))
+
 	switch cmd := msg.Command.(type) {
-	case *controller.Message_AppendActor:
-		c.onAppendActor(ctx, cmd.AppendActor)
+	// case *controller.Message_AppendActor:
+
+	// 	c.onAppendActor(ctx, cmd.AppendActor)
 	case *controller.Message_AppendPyFunc:
 		c.onAppendPyFunc(ctx, cmd.AppendPyFunc)
 	case *controller.Message_AppendData:
 		c.onAppendData(ctx, cmd.AppendData)
 	case *controller.Message_AppendArg:
 		c.onAppendArg(ctx, cmd.AppendArg)
+	case *controller.Message_DAG:
+		// jsonBytes, _ := json.Marshal(cmd.DAG)
+		// logrus.Info("control: onDAG",
+		// 	"dag", string(jsonBytes),
+		// )
+		c.onDAG(ctx, cmd.DAG)
 	}
 }
 
@@ -234,5 +257,50 @@ func SpawnTaskController(
 		Store: store,
 		ID:    "controller",
 		PID:   pid,
+	}
+}
+
+type ApplicationInfo interface {
+	GetDAG() *controller.DAG
+	SetDAG(dag *controller.DAG)
+}
+
+// For iarnet
+func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.Deployer,
+	appInfo ApplicationInfo, c remote.Controller, onClose func()) *proto.ActorRef {
+
+	store := store.Spawn(ctx, nil, "store-"+appID)
+
+	controllerId := "controller-" + appID
+	props := actor.PropsFromProducer(func() actor.Actor {
+		return &Controller{
+			id:         controllerId,
+			controller: c,
+			appID:      appID,
+			appInfo:    appInfo,
+			deployer:   deployer,
+			store:      store,
+			nodes:      make(map[string]*task.Node),
+			groups:     make(map[string]*task.ActorGroup),
+			runtimes:   make(map[string]*task.Runtime),
+		}
+	})
+
+	pid, _ := ctx.SpawnNamed(props, controllerId)
+	logrus.Infof("control: spawn controller %s with pid %s", controllerId, pid)
+
+	go func() {
+		defer onClose()
+		for msg := range c.RecvChan() {
+			ctx.Send(pid, msg)
+		}
+	}()
+
+	router.Register(controllerId, pid)
+
+	return &proto.ActorRef{
+		// Store: store,
+		ID:  controllerId,
+		PID: pid,
 	}
 }

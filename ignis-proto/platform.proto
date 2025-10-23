@@ -46,14 +46,15 @@ message EncodedObject {
 
 message StreamChunk {
   string StreamID = 1;
-  bool EoS = 2;
-  proto.EncodedObject Value = 3;
-  string Error = 4;
+  string Target = 2; // TODO: 封装统一消息类型包含 replyTo 和 target
+  bool EoS = 3;
+  proto.EncodedObject Value = 4;
+  string Error = 5;
 }
 
 // Invoke is sent to compute actor, providing a value to its dependency.
 message Invoke {
-  ActorRef Target = 1; // target actor reference
+  string Target = 1; // target actor reference
   string SessionID = 2; // id of current execution session
   string Param = 3; // name of parameter
   Flow Value = 4; // value of parameter
@@ -65,12 +66,12 @@ message Invoke {
 message InvokeStart {
   ActorInfo Info = 1; // (optional) actor info for latency measurement, required when using actor group
   string SessionID = 2; // id of current execution session
-  ActorRef ReplyTo = 3; // actor to reply to, usually points to calling controller actor
+  string ReplyTo = 3; // actor to reply to, usually points to calling controller actor
 }
 
 // InvokeResponse is sent to controller actor after invoking.
 message InvokeResponse {
-  ActorRef Target = 1; // target actor reference
+  string Target = 1; // target actor reference
   string SessionID = 2; // id of current execution session
   Flow Result = 3; // result object reference of the invocation
   string Error = 4; // (optional) error message

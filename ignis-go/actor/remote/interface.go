@@ -5,6 +5,7 @@ import (
 
 	pb "google.golang.org/protobuf/proto"
 
+	"github.com/9triver/ignis/proto/cluster"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/proto/executor"
 )
@@ -28,6 +29,8 @@ type Stream[I, O pb.Message] interface {
 type Executor Stream[*executor.Message, *executor.Message]
 
 type Controller Stream[*controller.Message, *controller.Message]
+
+type ComputeStream Stream[*cluster.Message, *cluster.Message]
 
 type Manager interface {
 	Addr() string

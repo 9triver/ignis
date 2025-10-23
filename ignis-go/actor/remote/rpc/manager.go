@@ -9,12 +9,14 @@ import (
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/9triver/ignis/proto/executor"
+	"github.com/sirupsen/logrus"
 )
 
 type ConnectionManager struct {
 	addr string
 	cs   *controllerService
 	es   *executorService
+	cps  *computeService
 }
 
 func (cm *ConnectionManager) Addr() string {
@@ -24,16 +26,23 @@ func (cm *ConnectionManager) Addr() string {
 func (cm *ConnectionManager) Run(ctx context.Context) error {
 	defer cm.cs.close()
 	defer cm.es.close()
+	defer cm.cps.close()
 
 	lis, err := net.Listen("tcp", cm.addr)
+	logrus.Infof("RPC server listening on %s", cm.addr)
+
 	if err != nil {
 		return err
 	}
-	server := grpc.NewServer(grpc.MaxRecvMsgSize(512 * 1024 * 1024))
+	server := grpc.NewServer(
+		grpc.MaxRecvMsgSize(512*1024*1024),
+		grpc.MaxSendMsgSize(512*1024*1024),
+	)
 	defer server.Stop()
 
 	controller.RegisterServiceServer(server, cm.cs)
 	executor.RegisterServiceServer(server, cm.es)
+	// cluster.RegisterServiceServer(server, cm.cps)
 
 	ech := make(chan error)
 	go func() {

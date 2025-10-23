@@ -9,8 +9,8 @@ import (
 	"github.com/9triver/ignis/utils/errors"
 )
 
-func NewStreamChunk(streamId string, value *EncodedObject, err error) *StreamChunk {
-	chunk := &StreamChunk{StreamID: streamId, EoS: false}
+func NewStreamChunk(streamId string, target string, value *EncodedObject, err error) *StreamChunk {
+	chunk := &StreamChunk{StreamID: streamId, Target: target, EoS: false}
 	if err != nil {
 		chunk.Error = err.Error()
 	} else {
@@ -19,8 +19,8 @@ func NewStreamChunk(streamId string, value *EncodedObject, err error) *StreamChu
 	return chunk
 }
 
-func NewStreamEnd(streamId string) *StreamChunk {
-	return &StreamChunk{StreamID: streamId, EoS: true}
+func NewStreamEnd(streamId string, target string) *StreamChunk {
+	return &StreamChunk{StreamID: streamId, Target: target, EoS: true}
 }
 
 /** Definition for EncodedObject (generated):
@@ -83,6 +83,6 @@ func (ref *ActorRef) Addr() string {
 	return fmt.Sprintf("actor.%s@%s", ref.ID, ref.Store.Addr())
 }
 
-func (sr *InvokeStart) GetTarget() *ActorRef {
-	return sr.Info.Ref
+func (sr *InvokeStart) GetTarget() string {
+	return sr.Info.Ref.ID
 }

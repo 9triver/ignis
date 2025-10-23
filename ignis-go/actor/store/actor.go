@@ -6,6 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/remote"
+	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/proto"
@@ -25,12 +26,21 @@ type Actor struct {
 }
 
 func (s *Actor) onObjectRequest(ctx actor.Context, req *cluster.ObjectRequest) {
+	if req.Target != s.id {
+		ctx.Logger().Warn("store: object request target not match",
+			"id", req.ID,
+			"target", req.Target,
+			"store", s.id,
+		)
+		return
+	}
+
 	ctx.Logger().Info("store: responding object",
 		"id", req.ID,
-		"replyTo", req.ReplyTo.ID,
+		"replyTo", req.ReplyTo,
 	)
 
-	reply := &cluster.ObjectResponse{ID: req.ID}
+	reply := &cluster.ObjectResponse{ID: req.ID, Target: req.ReplyTo}
 	obj, ok := s.localObjects[req.ID]
 	if !ok {
 		reply.Error = errors.Format("store: object %s not found", req.ID).Error()
@@ -39,16 +49,16 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *cluster.ObjectRequest) {
 	} else {
 		reply.Value = encoded
 	}
-	s.stub.SendTo(req.ReplyTo, reply)
+	router.Send(ctx, req.ReplyTo, reply)
 
 	// if requested object is a stream, send all chunks
 	if stream, ok := obj.(*objects.Stream); ok {
 		go func() {
-			defer s.stub.SendTo(req.ReplyTo, proto.NewStreamEnd(req.ID))
+			defer router.Send(ctx, req.ReplyTo, proto.NewStreamEnd(req.ID, req.ReplyTo))
 			for obj := range stream.ToChan() {
 				encoded, err := obj.Encode()
-				msg := proto.NewStreamChunk(req.ID, encoded, err)
-				s.stub.SendTo(req.ReplyTo, msg)
+				msg := proto.NewStreamChunk(req.ID, req.ReplyTo, encoded, err)
+				router.Send(ctx, req.ReplyTo, msg)
 			}
 		}()
 	}
@@ -129,7 +139,7 @@ func (s *Actor) getLocalObject(flow *proto.Flow) (objects.Interface, error) {
 	return obj, nil
 }
 
-func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[objects.Interface] {
+func (s *Actor) requestRemoteObject(ctx actor.Context, flow *proto.Flow) utils.Future[objects.Interface] {
 	if fut, ok := s.remoteObjects[flow.ID]; ok {
 		return fut
 	}
@@ -138,9 +148,11 @@ func (s *Actor) requestRemoteObject(flow *proto.Flow) utils.Future[objects.Inter
 	s.remoteObjects[flow.ID] = fut
 
 	remoteRef := flow.Source
-	s.stub.SendTo(remoteRef, &cluster.ObjectRequest{
+
+	router.Send(ctx, remoteRef.ID, &cluster.ObjectRequest{
 		ID:      flow.ID,
-		ReplyTo: s.ref,
+		Target:  flow.Source.ID,
+		ReplyTo: s.id,
 	})
 	return fut
 }
@@ -151,14 +163,14 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 		"store", req.Flow.Source.ID,
 	)
 
-	if req.Flow.Source.ID == s.ref.ID {
+	if req.Flow.Source.ID == s.id {
 		obj, err := s.getLocalObject(req.Flow)
 		ctx.Send(req.ReplyTo, &ObjectResponse{
 			Value: obj,
 			Error: err,
 		})
 	} else {
-		s.requestRemoteObject(req.Flow).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
+		s.requestRemoteObject(ctx, req.Flow).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
 			ctx.Send(req.ReplyTo, &ObjectResponse{
 				Value: obj,
 				Error: err,
@@ -167,14 +179,19 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 	}
 }
 
-func (s *Actor) onForward(ctx actor.Context, forward forwardMessage) {
-	target := forward.GetTarget()
-	if target.Store.Equals(s.ref) { // target is local
-		ctx.Send(target.PID, forward)
-	} else {
-		ctx.Logger().Info("store: forwarding request")
-		s.stub.SendTo(target.Store, forward)
-	}
+func (s *Actor) onForward(ctx actor.Context, forward ForwardMessage) {
+	// target := forward.GetTarget()
+	// if target.Store.ID == s.ref.ID { // target is local
+	// 	ctx.Send(target.PID, forward)
+	// } else {
+	// 	ctx.Logger().Info("store: forwarding request")
+	// 	s.stub.SendTo(target.Store, forward)
+	// }
+	ctx.Logger().Info("store: forwarding request",
+		"target", forward.GetTarget(),
+		"msg", forward,
+	)
+	router.Send(ctx, forward.GetTarget(), forward)
 }
 
 func (s *Actor) Receive(ctx actor.Context) {
@@ -193,8 +210,10 @@ func (s *Actor) Receive(ctx actor.Context) {
 	case *RequestObject:
 		s.onFlowRequest(ctx, msg)
 	// forward messages
-	case forwardMessage:
+	case ForwardMessage:
 		s.onForward(ctx, msg)
+	default:
+		ctx.Logger().Warn("store: unknown message type", "store", s.id, "type", msg)
 	}
 }
 
@@ -223,6 +242,7 @@ func Spawn(ctx *actor.RootContext, stub remote.Stub, id string) *proto.StoreRef 
 		return s
 	})
 	pid, _ := ctx.SpawnNamed(props, "store."+id)
+	router.Register(id, pid)
 	ref := &proto.StoreRef{
 		ID:  id,
 		PID: pid,

@@ -29,7 +29,7 @@ type SessionInvoke struct {
 
 type SessionStart struct {
 	Info    *proto.ActorInfo
-	ReplyTo *proto.ActorRef
+	ReplyTo string
 }
 
 func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
@@ -43,7 +43,7 @@ func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
 }
 
 func (s *Session) onStart(ctx actor.Context, start *SessionStart) {
-	ctx.Logger().Info("session: start execution", "session", s.id, "replyTo", start.ReplyTo.ID)
+	ctx.Logger().Info("session: start execution", "session", s.id, "replyTo", start.ReplyTo)
 	s.start = start
 	if s.deps.Empty() {
 		s.doInvoke(ctx)
@@ -85,6 +85,7 @@ func (s *Session) onComplete(ctx actor.Context, obj objects.Interface, duration 
 }
 
 func (s *Session) doInvoke(ctx actor.Context) {
+	ctx.Logger().Info("session: invoke execution", "session", s.id, "params", s.params)
 	exec := &ExecInput{
 		Context:   ctx,
 		SessionID: s.id,
