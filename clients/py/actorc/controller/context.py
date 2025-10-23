@@ -25,60 +25,60 @@ def parse_memory_string(memory_str):
     """
     将Kubernetes风格的内存字符串转换为字节数
     支持的单位: K, M, G, T, P, E (1000进制) 和 Ki, Mi, Gi, Ti, Pi, Ei (1024进制)
-    
+
     Args:
         memory_str: 内存字符串，如 "1024Mi", "2Gi", "512M" 等
-        
+
     Returns:
         int: 以字节为单位的内存大小
     """
     if isinstance(memory_str, (int, float)):
         return int(memory_str)
-    
+
     if not isinstance(memory_str, str):
         raise ValueError(f"Invalid memory format: {memory_str}")
-    
+
     # 移除空格并转换为大写
     memory_str = memory_str.strip()
-    
+
     # 正则表达式匹配数字和单位
-    match = re.match(r'^(\d+(?:\.\d+)?)\s*([KMGTPE]i?)?$', memory_str, re.IGNORECASE)
+    match = re.match(r"^(\d+(?:\.\d+)?)\s*([KMGTPE]i?)?$", memory_str, re.IGNORECASE)
     if not match:
         raise ValueError(f"Invalid memory format: {memory_str}")
-    
+
     value = float(match.group(1))
     unit = match.group(2)
-    
+
     if not unit:
         # 没有单位，默认为字节
         return int(value)
-    
+
     unit = unit.upper()
-    
+
     # 1024进制单位 (Ki, Mi, Gi, Ti, Pi, Ei)
-    if unit.endswith('I'):
+    if unit.endswith("I"):
         multipliers = {
-            'KI': 1024,
-            'MI': 1024 ** 2,
-            'GI': 1024 ** 3,
-            'TI': 1024 ** 4,
-            'PI': 1024 ** 5,
-            'EI': 1024 ** 6,
+            "KI": 1024,
+            "MI": 1024**2,
+            "GI": 1024**3,
+            "TI": 1024**4,
+            "PI": 1024**5,
+            "EI": 1024**6,
         }
     else:
         # 1000进制单位 (K, M, G, T, P, E)
         multipliers = {
-            'K': 1000,
-            'M': 1000 ** 2,
-            'G': 1000 ** 3,
-            'T': 1000 ** 4,
-            'P': 1000 ** 5,
-            'E': 1000 ** 6,
+            "K": 1000,
+            "M": 1000**2,
+            "G": 1000**3,
+            "T": 1000**4,
+            "P": 1000**5,
+            "E": 1000**6,
         }
-    
+
     if unit not in multipliers:
         raise ValueError(f"Unknown memory unit: {unit}")
-    
+
     return int(value * multipliers[unit])
 
 
@@ -86,50 +86,50 @@ def convert_dag_to_proto(dag):
     """Convert lucas DAG object to proto DAG message"""
     dag_metadata = dag.metadata()
     proto_nodes = []
-    
+
     for node_data in dag_metadata:
-        if node_data['type'] == 'ControlNode':
+        if node_data["type"] == "ControlNode":
             # Create ControlNode proto message
             control_node = controller_pb2.ControlNode()
-            control_node.Id = node_data['id']
-            control_node.Done = node_data['done']
-            control_node.FunctionName = node_data['functionname']
+            control_node.Id = node_data["id"]
+            control_node.Done = node_data["done"]
+            control_node.FunctionName = node_data["functionname"]
             # Handle params map
-            for key, value in node_data['params'].items():
+            for key, value in node_data["params"].items():
                 control_node.Params[key] = str(value)
-            control_node.Current = node_data['current']
-            control_node.DataNode = node_data['data_node']
-            control_node.PreDataNodes.extend(node_data['pre_data_nodes'])
-            control_node.FunctionType = node_data['functiontype']
-            
+            control_node.Current = node_data["current"]
+            control_node.DataNode = node_data["data_node"]
+            control_node.PreDataNodes.extend(node_data["pre_data_nodes"])
+            control_node.FunctionType = node_data["functiontype"]
+
             # Create DAGNode with ControlNode
             dag_node = controller_pb2.DAGNode()
             dag_node.Type = "ControlNode"
             dag_node.ControlNode.CopyFrom(control_node)
             proto_nodes.append(dag_node)
-            
-        elif node_data['type'] == 'DataNode':
+
+        elif node_data["type"] == "DataNode":
             # Create DataNode proto message
             data_node = controller_pb2.DataNode()
-            data_node.Id = node_data['id']
-            data_node.Done = node_data['done']
-            data_node.Lambda = node_data['lambda']
-            data_node.Ready = node_data['ready']
-            data_node.SufControlNodes.extend(node_data['suf_control_nodes'])
-            data_node.ChildNode.extend(node_data['child_node'])
-            
+            data_node.Id = node_data["id"]
+            data_node.Done = node_data["done"]
+            data_node.Lambda = node_data["lambda"]
+            data_node.Ready = node_data["ready"]
+            data_node.SufControlNodes.extend(node_data["suf_control_nodes"])
+            data_node.ChildNode.extend(node_data["child_node"])
+
             # Handle optional fields
-            if node_data['pre_control_node'] is not None:
-                data_node.PreControlNode = node_data['pre_control_node']
-            if node_data['parent_node'] is not None:
-                data_node.ParentNode = node_data['parent_node']
-            
+            if node_data["pre_control_node"] is not None:
+                data_node.PreControlNode = node_data["pre_control_node"]
+            if node_data["parent_node"] is not None:
+                data_node.ParentNode = node_data["parent_node"]
+
             # Create DAGNode with DataNode
             dag_node = controller_pb2.DAGNode()
             dag_node.Type = "DataNode"
             dag_node.DataNode.CopyFrom(data_node)
             proto_nodes.append(dag_node)
-    
+
     # Create and return proto DAG
     proto_dag = controller_pb2.DAG()
     proto_dag.Nodes.extend(proto_nodes)
@@ -400,14 +400,11 @@ class ActorExecutor(Executor):
             if _end:
                 break
         result = None
-        print(self.dag.get_nodes())
         for node in self.dag.get_nodes():
-            
-            if isinstance(node, DataNode):
-                print(node._is_end_node)
-                if node._is_end_node:
-                    result = node._ld.value
-                    break
-        
+
+            if isinstance(node, DataNode) and node._is_end_node:
+                result = node._ld.value
+                break
+
         self.dag.reset()
         return result

@@ -19,6 +19,7 @@ class CommandType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     BK_RETURN_RESULT: _ClassVar[CommandType]
     FR_REGISTER_REQUEST: _ClassVar[CommandType]
     FR_DAG: _ClassVar[CommandType]
+    FR_DAG_NODE_DONE: _ClassVar[CommandType]
 UNSPECIFIED: CommandType
 ACK: CommandType
 FR_READY: CommandType
@@ -29,6 +30,7 @@ FR_APPEND_ARG: CommandType
 BK_RETURN_RESULT: CommandType
 FR_REGISTER_REQUEST: CommandType
 FR_DAG: CommandType
+FR_DAG_NODE_DONE: CommandType
 
 class Ack(_message.Message):
     __slots__ = ("Error",)
@@ -205,8 +207,14 @@ class DAG(_message.Message):
     Nodes: _containers.RepeatedCompositeFieldContainer[DAGNode]
     def __init__(self, Nodes: _Optional[_Iterable[_Union[DAGNode, _Mapping]]] = ...) -> None: ...
 
+class MarkDAGNodeDone(_message.Message):
+    __slots__ = ("NodeID",)
+    NODEID_FIELD_NUMBER: _ClassVar[int]
+    NodeID: str
+    def __init__(self, NodeID: _Optional[str] = ...) -> None: ...
+
 class Message(_message.Message):
-    __slots__ = ("Type", "Ack", "Ready", "AppendData", "AppendActor", "AppendPyFunc", "AppendArg", "ReturnResult", "RegisterRequest", "DAG")
+    __slots__ = ("Type", "Ack", "Ready", "AppendData", "AppendActor", "AppendPyFunc", "AppendArg", "ReturnResult", "RegisterRequest", "DAG", "MarkDAGNodeDone")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ACK_FIELD_NUMBER: _ClassVar[int]
     READY_FIELD_NUMBER: _ClassVar[int]
@@ -217,6 +225,7 @@ class Message(_message.Message):
     RETURNRESULT_FIELD_NUMBER: _ClassVar[int]
     REGISTERREQUEST_FIELD_NUMBER: _ClassVar[int]
     DAG_FIELD_NUMBER: _ClassVar[int]
+    MARKDAGNODEDONE_FIELD_NUMBER: _ClassVar[int]
     Type: CommandType
     Ack: Ack
     Ready: Ready
@@ -227,4 +236,5 @@ class Message(_message.Message):
     ReturnResult: ReturnResult
     RegisterRequest: RegisterRequest
     DAG: DAG
-    def __init__(self, Type: _Optional[_Union[CommandType, str]] = ..., Ack: _Optional[_Union[Ack, _Mapping]] = ..., Ready: _Optional[_Union[Ready, _Mapping]] = ..., AppendData: _Optional[_Union[AppendData, _Mapping]] = ..., AppendActor: _Optional[_Union[AppendActor, _Mapping]] = ..., AppendPyFunc: _Optional[_Union[AppendPyFunc, _Mapping]] = ..., AppendArg: _Optional[_Union[AppendArg, _Mapping]] = ..., ReturnResult: _Optional[_Union[ReturnResult, _Mapping]] = ..., RegisterRequest: _Optional[_Union[RegisterRequest, _Mapping]] = ..., DAG: _Optional[_Union[DAG, _Mapping]] = ...) -> None: ...
+    MarkDAGNodeDone: MarkDAGNodeDone
+    def __init__(self, Type: _Optional[_Union[CommandType, str]] = ..., Ack: _Optional[_Union[Ack, _Mapping]] = ..., Ready: _Optional[_Union[Ready, _Mapping]] = ..., AppendData: _Optional[_Union[AppendData, _Mapping]] = ..., AppendActor: _Optional[_Union[AppendActor, _Mapping]] = ..., AppendPyFunc: _Optional[_Union[AppendPyFunc, _Mapping]] = ..., AppendArg: _Optional[_Union[AppendArg, _Mapping]] = ..., ReturnResult: _Optional[_Union[ReturnResult, _Mapping]] = ..., RegisterRequest: _Optional[_Union[RegisterRequest, _Mapping]] = ..., DAG: _Optional[_Union[DAG, _Mapping]] = ..., MarkDAGNodeDone: _Optional[_Union[MarkDAGNodeDone, _Mapping]] = ...) -> None: ...
