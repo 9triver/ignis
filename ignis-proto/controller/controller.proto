@@ -15,7 +15,7 @@ enum CommandType {
   BK_RETURN_RESULT = 7; // backend: send back execution result
   FR_REGISTER_REQUEST = 8; // backend: register application
   FR_DAG = 9; // frontend: send DAG structure
-  FR_DAG_NODE_DONE = 10; // frontend: notify DAG node done
+  FR_MARK_DAG_NODE_DONE = 10; // frontend: notify DAG node done
 }
 
 message Ack {
@@ -125,7 +125,8 @@ message DAG {
 }
 
 message MarkDAGNodeDone {
-  string NodeID = 1;
+  string NodeId = 1;
+  string SessionId = 2;
 }
 
 message Message {

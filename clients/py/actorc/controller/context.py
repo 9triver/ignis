@@ -397,6 +397,16 @@ class ActorExecutor(Executor):
                     log.info(f"{node.describe()} calculate {r_node.describe()}")
                     if r_node.is_ready():
                         task.append(r_node)
+                # TODO
+                message = controller_pb2.Message(
+                    Type=controller_pb2.CommandType.FR_MARK_DAG_NODE_DONE,
+                    MarkDAGNodeDone=controller_pb2.MarkDAGNodeDone(
+                        SessionId=session_id,
+                        NodeId=node.metadata()["id"],
+                    ),
+                )
+                print(1)
+                actorContext.send(message)
             if _end:
                 break
         result = None

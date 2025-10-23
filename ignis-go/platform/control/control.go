@@ -81,15 +81,24 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 		)
 		return
 	}
+
+	ctx.Logger().Info("2222")
+
 	group := task.NewGroup(f.Name)
 	c.groups[f.Name] = group
+
+	ctx.Logger().Info("33333")
 
 	for _, info := range infos {
 		group.Push(info)
 	}
 
+	ctx.Logger().Info("11111")
+
 	node := task.NodeFromActorGroup(f.Name, f.Params, group)
 	c.nodes[f.Name] = node
+
+	ctx.Logger().Info("44444")
 }
 
 func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData) {
@@ -165,6 +174,15 @@ func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
 	c.appInfo.SetDAG(dag)
 }
 
+func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.MarkDAGNodeDone) {
+	ctx.Logger().Info("control: mark DAG node done",
+		"nodeID", markDone.NodeId,
+	)
+
+	// Update the application info with the node completion
+	c.appInfo.MarkNodeDone(markDone.NodeId)
+}
+
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
 	// jsonBytes, _ := json.Marshal(msg.Command)
 	// logrus.Info("control: onControllerMessage ", string(jsonBytes))
@@ -185,6 +203,8 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 		// 	"dag", string(jsonBytes),
 		// )
 		c.onDAG(ctx, cmd.DAG)
+	case *controller.Message_MarkDAGNodeDone:
+		c.onMarkDAGNodeDone(ctx, cmd.MarkDAGNodeDone)
 	}
 }
 
@@ -211,6 +231,35 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeResponse) {
 
 	if group, ok := c.groups[name]; ok {
 		group.Push(ir.Info)
+	}
+
+	// Automatically mark the corresponding ControlNode and its output DataNode as done when task execution completes
+	if c.appInfo != nil {
+		// Find the node IDs by function name
+		controlNodeID, outputDataNodeID := c.findNodeIDsByFunctionName(name)
+		if controlNodeID != "" {
+			ctx.Logger().Info("control: auto-marking ControlNode done",
+				"functionName", name,
+				"controlNodeID", controlNodeID,
+				"sessionId", sessionId,
+			)
+			c.appInfo.MarkNodeDone(controlNodeID)
+			
+			// Also mark the output DataNode as done if it exists
+			if outputDataNodeID != "" {
+				ctx.Logger().Info("control: auto-marking output DataNode done",
+					"functionName", name,
+					"outputDataNodeID", outputDataNodeID,
+					"sessionId", sessionId,
+				)
+				c.appInfo.MarkNodeDone(outputDataNodeID)
+			}
+		} else {
+			ctx.Logger().Warn("control: could not find node ID for function",
+				"functionName", name,
+				"sessionId", sessionId,
+			)
+		}
 	}
 
 	msg := controller.NewReturnResult(sessionId, instanceId, name, ir.Result, nil)
@@ -263,6 +312,7 @@ func SpawnTaskController(
 type ApplicationInfo interface {
 	GetDAG() *controller.DAG
 	SetDAG(dag *controller.DAG)
+	MarkNodeDone(nodeID string)
 }
 
 // For iarnet
@@ -303,4 +353,30 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 		ID:  controllerId,
 		PID: pid,
 	}
+}
+
+// findNodeIDsByFunctionName finds the ControlNode ID and its output DataNode ID by function name
+func (c *Controller) findNodeIDsByFunctionName(functionName string) (controlNodeID, outputDataNodeID string) {
+	if c.appInfo == nil {
+		return "", ""
+	}
+
+	dag := c.appInfo.GetDAG()
+	if dag == nil {
+		return "", ""
+	}
+
+	// Find the ControlNode with the matching function name
+	for _, node := range dag.Nodes {
+		if node.Type == "ControlNode" && node.GetControlNode() != nil {
+			controlNode := node.GetControlNode()
+			if controlNode.FunctionName == functionName {
+				controlNodeID = controlNode.Id
+				outputDataNodeID = controlNode.DataNode // This is the output DataNode ID
+				return controlNodeID, outputDataNodeID
+			}
+		}
+	}
+
+	return "", ""
 }

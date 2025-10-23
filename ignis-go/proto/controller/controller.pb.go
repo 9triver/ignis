@@ -25,17 +25,17 @@ const (
 type CommandType int32
 
 const (
-	CommandType_UNSPECIFIED         CommandType = 0 // unknown command type
-	CommandType_ACK                 CommandType = 1 // acknowledged
-	CommandType_FR_READY            CommandType = 2
-	CommandType_FR_APPEND_DATA      CommandType = 3  // frontend: append data node
-	CommandType_FR_APPEND_ACTOR     CommandType = 4  // front: append actor (for debugging purpose)
-	CommandType_FR_APPEND_PY_FUNC   CommandType = 5  // frontend: append python function (control node definition)
-	CommandType_FR_APPEND_ARG       CommandType = 6  // frontend: append function arg to specified actor
-	CommandType_BK_RETURN_RESULT    CommandType = 7  // backend: send back execution result
-	CommandType_FR_REGISTER_REQUEST CommandType = 8  // backend: register application
-	CommandType_FR_DAG              CommandType = 9  // frontend: send DAG structure
-	CommandType_FR_DAG_NODE_DONE    CommandType = 10 // frontend: notify DAG node done
+	CommandType_UNSPECIFIED           CommandType = 0 // unknown command type
+	CommandType_ACK                   CommandType = 1 // acknowledged
+	CommandType_FR_READY              CommandType = 2
+	CommandType_FR_APPEND_DATA        CommandType = 3  // frontend: append data node
+	CommandType_FR_APPEND_ACTOR       CommandType = 4  // front: append actor (for debugging purpose)
+	CommandType_FR_APPEND_PY_FUNC     CommandType = 5  // frontend: append python function (control node definition)
+	CommandType_FR_APPEND_ARG         CommandType = 6  // frontend: append function arg to specified actor
+	CommandType_BK_RETURN_RESULT      CommandType = 7  // backend: send back execution result
+	CommandType_FR_REGISTER_REQUEST   CommandType = 8  // backend: register application
+	CommandType_FR_DAG                CommandType = 9  // frontend: send DAG structure
+	CommandType_FR_MARK_DAG_NODE_DONE CommandType = 10 // frontend: notify DAG node done
 )
 
 // Enum value maps for CommandType.
@@ -51,20 +51,20 @@ var (
 		7:  "BK_RETURN_RESULT",
 		8:  "FR_REGISTER_REQUEST",
 		9:  "FR_DAG",
-		10: "FR_DAG_NODE_DONE",
+		10: "FR_MARK_DAG_NODE_DONE",
 	}
 	CommandType_value = map[string]int32{
-		"UNSPECIFIED":         0,
-		"ACK":                 1,
-		"FR_READY":            2,
-		"FR_APPEND_DATA":      3,
-		"FR_APPEND_ACTOR":     4,
-		"FR_APPEND_PY_FUNC":   5,
-		"FR_APPEND_ARG":       6,
-		"BK_RETURN_RESULT":    7,
-		"FR_REGISTER_REQUEST": 8,
-		"FR_DAG":              9,
-		"FR_DAG_NODE_DONE":    10,
+		"UNSPECIFIED":           0,
+		"ACK":                   1,
+		"FR_READY":              2,
+		"FR_APPEND_DATA":        3,
+		"FR_APPEND_ACTOR":       4,
+		"FR_APPEND_PY_FUNC":     5,
+		"FR_APPEND_ARG":         6,
+		"BK_RETURN_RESULT":      7,
+		"FR_REGISTER_REQUEST":   8,
+		"FR_DAG":                9,
+		"FR_MARK_DAG_NODE_DONE": 10,
 	}
 )
 
@@ -1152,7 +1152,8 @@ func (x *DAG) GetNodes() []*DAGNode {
 
 type MarkDAGNodeDone struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeID        string                 `protobuf:"bytes,1,opt,name=NodeID,proto3" json:"NodeID,omitempty"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=SessionId,proto3" json:"SessionId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1187,9 +1188,16 @@ func (*MarkDAGNodeDone) Descriptor() ([]byte, []int) {
 	return file_controller_controller_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *MarkDAGNodeDone) GetNodeID() string {
+func (x *MarkDAGNodeDone) GetNodeId() string {
 	if x != nil {
-		return x.NodeID
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *MarkDAGNodeDone) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
 	}
 	return ""
 }
@@ -1504,9 +1512,10 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\bDataNode\x18\x03 \x01(\v2\x14.controller.DataNodeH\x00R\bDataNodeB\x06\n" +
 	"\x04Node\"0\n" +
 	"\x03DAG\x12)\n" +
-	"\x05Nodes\x18\x01 \x03(\v2\x13.controller.DAGNodeR\x05Nodes\")\n" +
+	"\x05Nodes\x18\x01 \x03(\v2\x13.controller.DAGNodeR\x05Nodes\"G\n" +
 	"\x0fMarkDAGNodeDone\x12\x16\n" +
-	"\x06NodeID\x18\x01 \x01(\tR\x06NodeID\"\xf6\x04\n" +
+	"\x06NodeId\x18\x01 \x01(\tR\x06NodeId\x12\x1c\n" +
+	"\tSessionId\x18\x02 \x01(\tR\tSessionId\"\xf6\x04\n" +
 	"\aMessage\x12+\n" +
 	"\x04Type\x18\x01 \x01(\x0e2\x17.controller.CommandTypeR\x04Type\x12#\n" +
 	"\x03Ack\x18\x02 \x01(\v2\x0f.controller.AckH\x00R\x03Ack\x12)\n" +
@@ -1522,7 +1531,7 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\x03DAG\x18\n" +
 	" \x01(\v2\x0f.controller.DAGH\x00R\x03DAG\x12G\n" +
 	"\x0fMarkDAGNodeDone\x18\v \x01(\v2\x1b.controller.MarkDAGNodeDoneH\x00R\x0fMarkDAGNodeDoneB\t\n" +
-	"\aCommand*\xd9\x01\n" +
+	"\aCommand*\xde\x01\n" +
 	"\vCommandType\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03ACK\x10\x01\x12\f\n" +
@@ -1534,8 +1543,8 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\x10BK_RETURN_RESULT\x10\a\x12\x17\n" +
 	"\x13FR_REGISTER_REQUEST\x10\b\x12\n" +
 	"\n" +
-	"\x06FR_DAG\x10\t\x12\x14\n" +
-	"\x10FR_DAG_NODE_DONE\x10\n" +
+	"\x06FR_DAG\x10\t\x12\x19\n" +
+	"\x15FR_MARK_DAG_NODE_DONE\x10\n" +
 	"2D\n" +
 	"\aService\x129\n" +
 	"\aSession\x12\x13.controller.Message\x1a\x13.controller.Message\"\x00(\x010\x01B+Z)github.com/9triver/ignis/proto/controllerb\x06proto3"

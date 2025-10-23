@@ -19,7 +19,7 @@ class CommandType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     BK_RETURN_RESULT: _ClassVar[CommandType]
     FR_REGISTER_REQUEST: _ClassVar[CommandType]
     FR_DAG: _ClassVar[CommandType]
-    FR_DAG_NODE_DONE: _ClassVar[CommandType]
+    FR_MARK_DAG_NODE_DONE: _ClassVar[CommandType]
 UNSPECIFIED: CommandType
 ACK: CommandType
 FR_READY: CommandType
@@ -30,7 +30,7 @@ FR_APPEND_ARG: CommandType
 BK_RETURN_RESULT: CommandType
 FR_REGISTER_REQUEST: CommandType
 FR_DAG: CommandType
-FR_DAG_NODE_DONE: CommandType
+FR_MARK_DAG_NODE_DONE: CommandType
 
 class Ack(_message.Message):
     __slots__ = ("Error",)
@@ -208,10 +208,12 @@ class DAG(_message.Message):
     def __init__(self, Nodes: _Optional[_Iterable[_Union[DAGNode, _Mapping]]] = ...) -> None: ...
 
 class MarkDAGNodeDone(_message.Message):
-    __slots__ = ("NodeID",)
+    __slots__ = ("NodeId", "SessionId")
     NODEID_FIELD_NUMBER: _ClassVar[int]
-    NodeID: str
-    def __init__(self, NodeID: _Optional[str] = ...) -> None: ...
+    SESSIONID_FIELD_NUMBER: _ClassVar[int]
+    NodeId: str
+    SessionId: str
+    def __init__(self, NodeId: _Optional[str] = ..., SessionId: _Optional[str] = ...) -> None: ...
 
 class Message(_message.Message):
     __slots__ = ("Type", "Ack", "Ready", "AppendData", "AppendActor", "AppendPyFunc", "AppendArg", "ReturnResult", "RegisterRequest", "DAG", "MarkDAGNodeDone")
