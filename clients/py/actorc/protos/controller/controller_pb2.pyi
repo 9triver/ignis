@@ -15,7 +15,10 @@ class CommandType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FR_APPEND_DATA: _ClassVar[CommandType]
     FR_APPEND_ACTOR: _ClassVar[CommandType]
     FR_APPEND_PY_FUNC: _ClassVar[CommandType]
+    FR_APPEND_PY_CLASS: _ClassVar[CommandType]
     FR_APPEND_ARG: _ClassVar[CommandType]
+    FR_APPEND_CLASS_METHOD_ARG: _ClassVar[CommandType]
+    FR_INVOKE: _ClassVar[CommandType]
     BK_RETURN_RESULT: _ClassVar[CommandType]
     FR_REGISTER_REQUEST: _ClassVar[CommandType]
     FR_DAG: _ClassVar[CommandType]
@@ -26,7 +29,10 @@ FR_READY: CommandType
 FR_APPEND_DATA: CommandType
 FR_APPEND_ACTOR: CommandType
 FR_APPEND_PY_FUNC: CommandType
+FR_APPEND_PY_CLASS: CommandType
 FR_APPEND_ARG: CommandType
+FR_APPEND_CLASS_METHOD_ARG: CommandType
+FR_INVOKE: CommandType
 BK_RETURN_RESULT: CommandType
 FR_REGISTER_REQUEST: CommandType
 FR_DAG: CommandType
@@ -110,6 +116,31 @@ class AppendPyFunc(_message.Message):
     Replicas: int
     def __init__(self, Name: _Optional[str] = ..., Params: _Optional[_Iterable[str]] = ..., Venv: _Optional[str] = ..., Requirements: _Optional[_Iterable[str]] = ..., PickledObject: _Optional[bytes] = ..., Language: _Optional[_Union[_platform_pb2.Language, str]] = ..., Resources: _Optional[_Union[Resources, _Mapping]] = ..., Replicas: _Optional[int] = ...) -> None: ...
 
+class AppendPyClass(_message.Message):
+    __slots__ = ("Name", "Methods", "Venv", "Requirements", "PickledObject", "Language", "Replicas")
+    class ClassMethod(_message.Message):
+        __slots__ = ("Name", "Params")
+        NAME_FIELD_NUMBER: _ClassVar[int]
+        PARAMS_FIELD_NUMBER: _ClassVar[int]
+        Name: str
+        Params: _containers.RepeatedScalarFieldContainer[str]
+        def __init__(self, Name: _Optional[str] = ..., Params: _Optional[_Iterable[str]] = ...) -> None: ...
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    METHODS_FIELD_NUMBER: _ClassVar[int]
+    VENV_FIELD_NUMBER: _ClassVar[int]
+    REQUIREMENTS_FIELD_NUMBER: _ClassVar[int]
+    PICKLEDOBJECT_FIELD_NUMBER: _ClassVar[int]
+    LANGUAGE_FIELD_NUMBER: _ClassVar[int]
+    REPLICAS_FIELD_NUMBER: _ClassVar[int]
+    Name: str
+    Methods: _containers.RepeatedCompositeFieldContainer[AppendPyClass.ClassMethod]
+    Venv: str
+    Requirements: _containers.RepeatedScalarFieldContainer[str]
+    PickledObject: bytes
+    Language: _platform_pb2.Language
+    Replicas: int
+    def __init__(self, Name: _Optional[str] = ..., Methods: _Optional[_Iterable[_Union[AppendPyClass.ClassMethod, _Mapping]]] = ..., Venv: _Optional[str] = ..., Requirements: _Optional[_Iterable[str]] = ..., PickledObject: _Optional[bytes] = ..., Language: _Optional[_Union[_platform_pb2.Language, str]] = ..., Replicas: _Optional[int] = ...) -> None: ...
+
 class AppendArg(_message.Message):
     __slots__ = ("SessionID", "InstanceID", "Name", "Param", "Value")
     SESSIONID_FIELD_NUMBER: _ClassVar[int]
@@ -123,6 +154,20 @@ class AppendArg(_message.Message):
     Param: str
     Value: Data
     def __init__(self, SessionID: _Optional[str] = ..., InstanceID: _Optional[str] = ..., Name: _Optional[str] = ..., Param: _Optional[str] = ..., Value: _Optional[_Union[Data, _Mapping]] = ...) -> None: ...
+
+class AppendClassMethodArg(_message.Message):
+    __slots__ = ("SessionID", "InstanceID", "MethodName", "Param", "Value")
+    SESSIONID_FIELD_NUMBER: _ClassVar[int]
+    INSTANCEID_FIELD_NUMBER: _ClassVar[int]
+    METHODNAME_FIELD_NUMBER: _ClassVar[int]
+    PARAM_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    SessionID: str
+    InstanceID: str
+    MethodName: str
+    Param: str
+    Value: Data
+    def __init__(self, SessionID: _Optional[str] = ..., InstanceID: _Optional[str] = ..., MethodName: _Optional[str] = ..., Param: _Optional[str] = ..., Value: _Optional[_Union[Data, _Mapping]] = ...) -> None: ...
 
 class Invoke(_message.Message):
     __slots__ = ("SessionID", "InstanceID", "Name")
@@ -226,14 +271,16 @@ class MarkDAGNodeDone(_message.Message):
     def __init__(self, NodeId: _Optional[str] = ..., SessionId: _Optional[str] = ...) -> None: ...
 
 class Message(_message.Message):
-    __slots__ = ("Type", "Ack", "Ready", "AppendData", "AppendActor", "AppendPyFunc", "AppendArg", "Invoke", "ReturnResult", "RegisterRequest", "DAG", "MarkDAGNodeDone")
+    __slots__ = ("Type", "Ack", "Ready", "AppendData", "AppendActor", "AppendPyFunc", "AppendPyClass", "AppendArg", "AppendClassMethodArg", "Invoke", "ReturnResult", "RegisterRequest", "DAG", "MarkDAGNodeDone")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ACK_FIELD_NUMBER: _ClassVar[int]
     READY_FIELD_NUMBER: _ClassVar[int]
     APPENDDATA_FIELD_NUMBER: _ClassVar[int]
     APPENDACTOR_FIELD_NUMBER: _ClassVar[int]
     APPENDPYFUNC_FIELD_NUMBER: _ClassVar[int]
+    APPENDPYCLASS_FIELD_NUMBER: _ClassVar[int]
     APPENDARG_FIELD_NUMBER: _ClassVar[int]
+    APPENDCLASSMETHODARG_FIELD_NUMBER: _ClassVar[int]
     INVOKE_FIELD_NUMBER: _ClassVar[int]
     RETURNRESULT_FIELD_NUMBER: _ClassVar[int]
     REGISTERREQUEST_FIELD_NUMBER: _ClassVar[int]
@@ -245,10 +292,12 @@ class Message(_message.Message):
     AppendData: AppendData
     AppendActor: AppendActor
     AppendPyFunc: AppendPyFunc
+    AppendPyClass: AppendPyClass
     AppendArg: AppendArg
+    AppendClassMethodArg: AppendClassMethodArg
     Invoke: Invoke
     ReturnResult: ReturnResult
     RegisterRequest: RegisterRequest
     DAG: DAG
     MarkDAGNodeDone: MarkDAGNodeDone
-    def __init__(self, Type: _Optional[_Union[CommandType, str]] = ..., Ack: _Optional[_Union[Ack, _Mapping]] = ..., Ready: _Optional[_Union[Ready, _Mapping]] = ..., AppendData: _Optional[_Union[AppendData, _Mapping]] = ..., AppendActor: _Optional[_Union[AppendActor, _Mapping]] = ..., AppendPyFunc: _Optional[_Union[AppendPyFunc, _Mapping]] = ..., AppendArg: _Optional[_Union[AppendArg, _Mapping]] = ..., Invoke: _Optional[_Union[Invoke, _Mapping]] = ..., ReturnResult: _Optional[_Union[ReturnResult, _Mapping]] = ..., RegisterRequest: _Optional[_Union[RegisterRequest, _Mapping]] = ..., DAG: _Optional[_Union[DAG, _Mapping]] = ..., MarkDAGNodeDone: _Optional[_Union[MarkDAGNodeDone, _Mapping]] = ...) -> None: ...
+    def __init__(self, Type: _Optional[_Union[CommandType, str]] = ..., Ack: _Optional[_Union[Ack, _Mapping]] = ..., Ready: _Optional[_Union[Ready, _Mapping]] = ..., AppendData: _Optional[_Union[AppendData, _Mapping]] = ..., AppendActor: _Optional[_Union[AppendActor, _Mapping]] = ..., AppendPyFunc: _Optional[_Union[AppendPyFunc, _Mapping]] = ..., AppendPyClass: _Optional[_Union[AppendPyClass, _Mapping]] = ..., AppendArg: _Optional[_Union[AppendArg, _Mapping]] = ..., AppendClassMethodArg: _Optional[_Union[AppendClassMethodArg, _Mapping]] = ..., Invoke: _Optional[_Union[Invoke, _Mapping]] = ..., ReturnResult: _Optional[_Union[ReturnResult, _Mapping]] = ..., RegisterRequest: _Optional[_Union[RegisterRequest, _Mapping]] = ..., DAG: _Optional[_Union[DAG, _Mapping]] = ..., MarkDAGNodeDone: _Optional[_Union[MarkDAGNodeDone, _Mapping]] = ...) -> None: ...

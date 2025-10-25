@@ -25,17 +25,20 @@ const (
 type CommandType int32
 
 const (
-	CommandType_UNSPECIFIED           CommandType = 0 // unknown command type
-	CommandType_ACK                   CommandType = 1 // acknowledged
-	CommandType_FR_READY              CommandType = 2
-	CommandType_FR_APPEND_DATA        CommandType = 3  // frontend: append data node
-	CommandType_FR_APPEND_ACTOR       CommandType = 4  // front: append actor (for debugging purpose)
-	CommandType_FR_APPEND_PY_FUNC     CommandType = 5  // frontend: append python function (control node definition)
-	CommandType_FR_APPEND_ARG         CommandType = 6  // frontend: append function arg to specified actor
-	CommandType_BK_RETURN_RESULT      CommandType = 7  // backend: send back execution result
-	CommandType_FR_REGISTER_REQUEST   CommandType = 8  // backend: register application
-	CommandType_FR_DAG                CommandType = 9  // frontend: send DAG structure
-	CommandType_FR_MARK_DAG_NODE_DONE CommandType = 10 // frontend: notify DAG node done
+	CommandType_UNSPECIFIED                CommandType = 0 // unknown command type
+	CommandType_ACK                        CommandType = 1 // acknowledged
+	CommandType_FR_READY                   CommandType = 2
+	CommandType_FR_APPEND_DATA             CommandType = 3 // frontend: append data node
+	CommandType_FR_APPEND_ACTOR            CommandType = 4 // front: append actor (for debugging purpose)
+	CommandType_FR_APPEND_PY_FUNC          CommandType = 5 // frontend: append python function (control node definition)
+	CommandType_FR_APPEND_PY_CLASS         CommandType = 6 // frontend: append python class (control node definition)
+	CommandType_FR_APPEND_ARG              CommandType = 7 // frontend: append function arg to specified actor
+	CommandType_FR_APPEND_CLASS_METHOD_ARG CommandType = 8 // frontend: append class method arg to specified actor
+	CommandType_FR_INVOKE                  CommandType = 9
+	CommandType_BK_RETURN_RESULT           CommandType = 10 // backend: send back execution result
+	CommandType_FR_REGISTER_REQUEST        CommandType = 11 // backend: register application
+	CommandType_FR_DAG                     CommandType = 12 // frontend: send DAG structure
+	CommandType_FR_MARK_DAG_NODE_DONE      CommandType = 13 // frontend: notify DAG node done
 )
 
 // Enum value maps for CommandType.
@@ -47,24 +50,30 @@ var (
 		3:  "FR_APPEND_DATA",
 		4:  "FR_APPEND_ACTOR",
 		5:  "FR_APPEND_PY_FUNC",
-		6:  "FR_APPEND_ARG",
-		7:  "BK_RETURN_RESULT",
-		8:  "FR_REGISTER_REQUEST",
-		9:  "FR_DAG",
-		10: "FR_MARK_DAG_NODE_DONE",
+		6:  "FR_APPEND_PY_CLASS",
+		7:  "FR_APPEND_ARG",
+		8:  "FR_APPEND_CLASS_METHOD_ARG",
+		9:  "FR_INVOKE",
+		10: "BK_RETURN_RESULT",
+		11: "FR_REGISTER_REQUEST",
+		12: "FR_DAG",
+		13: "FR_MARK_DAG_NODE_DONE",
 	}
 	CommandType_value = map[string]int32{
-		"UNSPECIFIED":           0,
-		"ACK":                   1,
-		"FR_READY":              2,
-		"FR_APPEND_DATA":        3,
-		"FR_APPEND_ACTOR":       4,
-		"FR_APPEND_PY_FUNC":     5,
-		"FR_APPEND_ARG":         6,
-		"BK_RETURN_RESULT":      7,
-		"FR_REGISTER_REQUEST":   8,
-		"FR_DAG":                9,
-		"FR_MARK_DAG_NODE_DONE": 10,
+		"UNSPECIFIED":                0,
+		"ACK":                        1,
+		"FR_READY":                   2,
+		"FR_APPEND_DATA":             3,
+		"FR_APPEND_ACTOR":            4,
+		"FR_APPEND_PY_FUNC":          5,
+		"FR_APPEND_PY_CLASS":         6,
+		"FR_APPEND_ARG":              7,
+		"FR_APPEND_CLASS_METHOD_ARG": 8,
+		"FR_INVOKE":                  9,
+		"BK_RETURN_RESULT":           10,
+		"FR_REGISTER_REQUEST":        11,
+		"FR_DAG":                     12,
+		"FR_MARK_DAG_NODE_DONE":      13,
 	}
 )
 
@@ -589,6 +598,99 @@ func (x *AppendPyFunc) GetReplicas() int32 {
 	return 0
 }
 
+type AppendPyClass struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Name          string                       `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"` // class name
+	Methods       []*AppendPyClass_ClassMethod `protobuf:"bytes,2,rep,name=Methods,proto3" json:"Methods,omitempty"`
+	Venv          string                       `protobuf:"bytes,3,opt,name=Venv,proto3" json:"Venv,omitempty"`                              // function virtual environment
+	Requirements  []string                     `protobuf:"bytes,4,rep,name=Requirements,proto3" json:"Requirements,omitempty"`              // function dependencies
+	PickledObject []byte                       `protobuf:"bytes,5,opt,name=PickledObject,proto3" json:"PickledObject,omitempty"`            // encoded function impl
+	Language      proto.Language               `protobuf:"varint,6,opt,name=Language,proto3,enum=proto.Language" json:"Language,omitempty"` // return type of function
+	// TODO: Resources
+	Replicas      int32 `protobuf:"varint,7,opt,name=Replicas,proto3" json:"Replicas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendPyClass) Reset() {
+	*x = AppendPyClass{}
+	mi := &file_controller_controller_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendPyClass) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendPyClass) ProtoMessage() {}
+
+func (x *AppendPyClass) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendPyClass.ProtoReflect.Descriptor instead.
+func (*AppendPyClass) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AppendPyClass) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AppendPyClass) GetMethods() []*AppendPyClass_ClassMethod {
+	if x != nil {
+		return x.Methods
+	}
+	return nil
+}
+
+func (x *AppendPyClass) GetVenv() string {
+	if x != nil {
+		return x.Venv
+	}
+	return ""
+}
+
+func (x *AppendPyClass) GetRequirements() []string {
+	if x != nil {
+		return x.Requirements
+	}
+	return nil
+}
+
+func (x *AppendPyClass) GetPickledObject() []byte {
+	if x != nil {
+		return x.PickledObject
+	}
+	return nil
+}
+
+func (x *AppendPyClass) GetLanguage() proto.Language {
+	if x != nil {
+		return x.Language
+	}
+	return proto.Language(0)
+}
+
+func (x *AppendPyClass) GetReplicas() int32 {
+	if x != nil {
+		return x.Replicas
+	}
+	return 0
+}
+
 type AppendArg struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionID     string                 `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"SessionID,omitempty"`   // current execution session
@@ -602,7 +704,7 @@ type AppendArg struct {
 
 func (x *AppendArg) Reset() {
 	*x = AppendArg{}
-	mi := &file_controller_controller_proto_msgTypes[7]
+	mi := &file_controller_controller_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -614,7 +716,7 @@ func (x *AppendArg) String() string {
 func (*AppendArg) ProtoMessage() {}
 
 func (x *AppendArg) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[7]
+	mi := &file_controller_controller_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -627,7 +729,7 @@ func (x *AppendArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendArg.ProtoReflect.Descriptor instead.
 func (*AppendArg) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{7}
+	return file_controller_controller_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AppendArg) GetSessionID() string {
@@ -665,6 +767,82 @@ func (x *AppendArg) GetValue() *Data {
 	return nil
 }
 
+type AppendClassMethodArg struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionID     string                 `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"SessionID,omitempty"`   // current execution session
+	InstanceID    string                 `protobuf:"bytes,2,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"` // id of **class** instance under current execution session
+	MethodName    string                 `protobuf:"bytes,3,opt,name=MethodName,proto3" json:"MethodName,omitempty"` // method name
+	Param         string                 `protobuf:"bytes,4,opt,name=Param,proto3" json:"Param,omitempty"`           // param name
+	Value         *Data                  `protobuf:"bytes,5,opt,name=Value,proto3" json:"Value,omitempty"`           // object ref for param
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendClassMethodArg) Reset() {
+	*x = AppendClassMethodArg{}
+	mi := &file_controller_controller_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendClassMethodArg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendClassMethodArg) ProtoMessage() {}
+
+func (x *AppendClassMethodArg) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendClassMethodArg.ProtoReflect.Descriptor instead.
+func (*AppendClassMethodArg) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AppendClassMethodArg) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
+	}
+	return ""
+}
+
+func (x *AppendClassMethodArg) GetInstanceID() string {
+	if x != nil {
+		return x.InstanceID
+	}
+	return ""
+}
+
+func (x *AppendClassMethodArg) GetMethodName() string {
+	if x != nil {
+		return x.MethodName
+	}
+	return ""
+}
+
+func (x *AppendClassMethodArg) GetParam() string {
+	if x != nil {
+		return x.Param
+	}
+	return ""
+}
+
+func (x *AppendClassMethodArg) GetValue() *Data {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
 type Invoke struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionID     string                 `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"SessionID,omitempty"`   // current execution session
@@ -676,7 +854,7 @@ type Invoke struct {
 
 func (x *Invoke) Reset() {
 	*x = Invoke{}
-	mi := &file_controller_controller_proto_msgTypes[8]
+	mi := &file_controller_controller_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -688,7 +866,7 @@ func (x *Invoke) String() string {
 func (*Invoke) ProtoMessage() {}
 
 func (x *Invoke) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[8]
+	mi := &file_controller_controller_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -701,7 +879,7 @@ func (x *Invoke) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Invoke.ProtoReflect.Descriptor instead.
 func (*Invoke) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{8}
+	return file_controller_controller_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Invoke) GetSessionID() string {
@@ -741,7 +919,7 @@ type ReturnResult struct {
 
 func (x *ReturnResult) Reset() {
 	*x = ReturnResult{}
-	mi := &file_controller_controller_proto_msgTypes[9]
+	mi := &file_controller_controller_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -753,7 +931,7 @@ func (x *ReturnResult) String() string {
 func (*ReturnResult) ProtoMessage() {}
 
 func (x *ReturnResult) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[9]
+	mi := &file_controller_controller_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -766,7 +944,7 @@ func (x *ReturnResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReturnResult.ProtoReflect.Descriptor instead.
 func (*ReturnResult) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{9}
+	return file_controller_controller_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReturnResult) GetSessionID() string {
@@ -840,7 +1018,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_controller_controller_proto_msgTypes[10]
+	mi := &file_controller_controller_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -852,7 +1030,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[10]
+	mi := &file_controller_controller_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -865,7 +1043,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{10}
+	return file_controller_controller_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RegisterRequest) GetApplicationID() string {
@@ -892,7 +1070,7 @@ type ControlNode struct {
 
 func (x *ControlNode) Reset() {
 	*x = ControlNode{}
-	mi := &file_controller_controller_proto_msgTypes[11]
+	mi := &file_controller_controller_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -904,7 +1082,7 @@ func (x *ControlNode) String() string {
 func (*ControlNode) ProtoMessage() {}
 
 func (x *ControlNode) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[11]
+	mi := &file_controller_controller_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -917,7 +1095,7 @@ func (x *ControlNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlNode.ProtoReflect.Descriptor instead.
 func (*ControlNode) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{11}
+	return file_controller_controller_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ControlNode) GetId() string {
@@ -992,7 +1170,7 @@ type DataNode struct {
 
 func (x *DataNode) Reset() {
 	*x = DataNode{}
-	mi := &file_controller_controller_proto_msgTypes[12]
+	mi := &file_controller_controller_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1004,7 +1182,7 @@ func (x *DataNode) String() string {
 func (*DataNode) ProtoMessage() {}
 
 func (x *DataNode) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[12]
+	mi := &file_controller_controller_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1017,7 +1195,7 @@ func (x *DataNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataNode.ProtoReflect.Descriptor instead.
 func (*DataNode) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{12}
+	return file_controller_controller_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DataNode) GetId() string {
@@ -1090,7 +1268,7 @@ type DAGNode struct {
 
 func (x *DAGNode) Reset() {
 	*x = DAGNode{}
-	mi := &file_controller_controller_proto_msgTypes[13]
+	mi := &file_controller_controller_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1102,7 +1280,7 @@ func (x *DAGNode) String() string {
 func (*DAGNode) ProtoMessage() {}
 
 func (x *DAGNode) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[13]
+	mi := &file_controller_controller_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1115,7 +1293,7 @@ func (x *DAGNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DAGNode.ProtoReflect.Descriptor instead.
 func (*DAGNode) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{13}
+	return file_controller_controller_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *DAGNode) GetType() string {
@@ -1175,7 +1353,7 @@ type DAG struct {
 
 func (x *DAG) Reset() {
 	*x = DAG{}
-	mi := &file_controller_controller_proto_msgTypes[14]
+	mi := &file_controller_controller_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1187,7 +1365,7 @@ func (x *DAG) String() string {
 func (*DAG) ProtoMessage() {}
 
 func (x *DAG) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[14]
+	mi := &file_controller_controller_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1200,7 +1378,7 @@ func (x *DAG) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DAG.ProtoReflect.Descriptor instead.
 func (*DAG) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{14}
+	return file_controller_controller_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DAG) GetNodes() []*DAGNode {
@@ -1220,7 +1398,7 @@ type MarkDAGNodeDone struct {
 
 func (x *MarkDAGNodeDone) Reset() {
 	*x = MarkDAGNodeDone{}
-	mi := &file_controller_controller_proto_msgTypes[15]
+	mi := &file_controller_controller_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1410,7 @@ func (x *MarkDAGNodeDone) String() string {
 func (*MarkDAGNodeDone) ProtoMessage() {}
 
 func (x *MarkDAGNodeDone) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[15]
+	mi := &file_controller_controller_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1423,7 @@ func (x *MarkDAGNodeDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkDAGNodeDone.ProtoReflect.Descriptor instead.
 func (*MarkDAGNodeDone) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{15}
+	return file_controller_controller_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MarkDAGNodeDone) GetNodeId() string {
@@ -1272,7 +1450,9 @@ type Message struct {
 	//	*Message_AppendData
 	//	*Message_AppendActor
 	//	*Message_AppendPyFunc
+	//	*Message_AppendPyClass
 	//	*Message_AppendArg
+	//	*Message_AppendClassMethodArg
 	//	*Message_Invoke
 	//	*Message_ReturnResult
 	//	*Message_RegisterRequest
@@ -1285,7 +1465,7 @@ type Message struct {
 
 func (x *Message) Reset() {
 	*x = Message{}
-	mi := &file_controller_controller_proto_msgTypes[16]
+	mi := &file_controller_controller_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1297,7 +1477,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_controller_proto_msgTypes[16]
+	mi := &file_controller_controller_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1310,7 +1490,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_controller_controller_proto_rawDescGZIP(), []int{16}
+	return file_controller_controller_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Message) GetType() CommandType {
@@ -1372,10 +1552,28 @@ func (x *Message) GetAppendPyFunc() *AppendPyFunc {
 	return nil
 }
 
+func (x *Message) GetAppendPyClass() *AppendPyClass {
+	if x != nil {
+		if x, ok := x.Command.(*Message_AppendPyClass); ok {
+			return x.AppendPyClass
+		}
+	}
+	return nil
+}
+
 func (x *Message) GetAppendArg() *AppendArg {
 	if x != nil {
 		if x, ok := x.Command.(*Message_AppendArg); ok {
 			return x.AppendArg
+		}
+	}
+	return nil
+}
+
+func (x *Message) GetAppendClassMethodArg() *AppendClassMethodArg {
+	if x != nil {
+		if x, ok := x.Command.(*Message_AppendClassMethodArg); ok {
+			return x.AppendClassMethodArg
 		}
 	}
 	return nil
@@ -1450,28 +1648,36 @@ type Message_AppendPyFunc struct {
 	AppendPyFunc *AppendPyFunc `protobuf:"bytes,6,opt,name=AppendPyFunc,proto3,oneof"`
 }
 
+type Message_AppendPyClass struct {
+	AppendPyClass *AppendPyClass `protobuf:"bytes,7,opt,name=AppendPyClass,proto3,oneof"`
+}
+
 type Message_AppendArg struct {
-	AppendArg *AppendArg `protobuf:"bytes,7,opt,name=AppendArg,proto3,oneof"`
+	AppendArg *AppendArg `protobuf:"bytes,8,opt,name=AppendArg,proto3,oneof"`
+}
+
+type Message_AppendClassMethodArg struct {
+	AppendClassMethodArg *AppendClassMethodArg `protobuf:"bytes,9,opt,name=AppendClassMethodArg,proto3,oneof"`
 }
 
 type Message_Invoke struct {
-	Invoke *Invoke `protobuf:"bytes,8,opt,name=Invoke,proto3,oneof"`
+	Invoke *Invoke `protobuf:"bytes,10,opt,name=Invoke,proto3,oneof"`
 }
 
 type Message_ReturnResult struct {
-	ReturnResult *ReturnResult `protobuf:"bytes,9,opt,name=ReturnResult,proto3,oneof"`
+	ReturnResult *ReturnResult `protobuf:"bytes,11,opt,name=ReturnResult,proto3,oneof"`
 }
 
 type Message_RegisterRequest struct {
-	RegisterRequest *RegisterRequest `protobuf:"bytes,10,opt,name=RegisterRequest,proto3,oneof"`
+	RegisterRequest *RegisterRequest `protobuf:"bytes,12,opt,name=RegisterRequest,proto3,oneof"`
 }
 
 type Message_DAG struct {
-	DAG *DAG `protobuf:"bytes,11,opt,name=DAG,proto3,oneof"`
+	DAG *DAG `protobuf:"bytes,13,opt,name=DAG,proto3,oneof"`
 }
 
 type Message_MarkDAGNodeDone struct {
-	MarkDAGNodeDone *MarkDAGNodeDone `protobuf:"bytes,12,opt,name=MarkDAGNodeDone,proto3,oneof"`
+	MarkDAGNodeDone *MarkDAGNodeDone `protobuf:"bytes,14,opt,name=MarkDAGNodeDone,proto3,oneof"`
 }
 
 func (*Message_Ack) isMessage_Command() {}
@@ -1484,7 +1690,11 @@ func (*Message_AppendActor) isMessage_Command() {}
 
 func (*Message_AppendPyFunc) isMessage_Command() {}
 
+func (*Message_AppendPyClass) isMessage_Command() {}
+
 func (*Message_AppendArg) isMessage_Command() {}
+
+func (*Message_AppendClassMethodArg) isMessage_Command() {}
 
 func (*Message_Invoke) isMessage_Command() {}
 
@@ -1495,6 +1705,58 @@ func (*Message_RegisterRequest) isMessage_Command() {}
 func (*Message_DAG) isMessage_Command() {}
 
 func (*Message_MarkDAGNodeDone) isMessage_Command() {}
+
+type AppendPyClass_ClassMethod struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	Params        []string               `protobuf:"bytes,2,rep,name=Params,proto3" json:"Params,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendPyClass_ClassMethod) Reset() {
+	*x = AppendPyClass_ClassMethod{}
+	mi := &file_controller_controller_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendPyClass_ClassMethod) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendPyClass_ClassMethod) ProtoMessage() {}
+
+func (x *AppendPyClass_ClassMethod) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendPyClass_ClassMethod.ProtoReflect.Descriptor instead.
+func (*AppendPyClass_ClassMethod) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{7, 0}
+}
+
+func (x *AppendPyClass_ClassMethod) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AppendPyClass_ClassMethod) GetParams() []string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
 
 var File_controller_controller_proto protoreflect.FileDescriptor
 
@@ -1537,13 +1799,34 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\rPickledObject\x18\x05 \x01(\fR\rPickledObject\x12+\n" +
 	"\bLanguage\x18\x06 \x01(\x0e2\x0f.proto.LanguageR\bLanguage\x123\n" +
 	"\tResources\x18\a \x01(\v2\x15.controller.ResourcesR\tResources\x12\x1a\n" +
-	"\bReplicas\x18\b \x01(\x05R\bReplicas\"\x9b\x01\n" +
+	"\bReplicas\x18\b \x01(\x05R\bReplicas\"\xc6\x02\n" +
+	"\rAppendPyClass\x12\x12\n" +
+	"\x04Name\x18\x01 \x01(\tR\x04Name\x12?\n" +
+	"\aMethods\x18\x02 \x03(\v2%.controller.AppendPyClass.ClassMethodR\aMethods\x12\x12\n" +
+	"\x04Venv\x18\x03 \x01(\tR\x04Venv\x12\"\n" +
+	"\fRequirements\x18\x04 \x03(\tR\fRequirements\x12$\n" +
+	"\rPickledObject\x18\x05 \x01(\fR\rPickledObject\x12+\n" +
+	"\bLanguage\x18\x06 \x01(\x0e2\x0f.proto.LanguageR\bLanguage\x12\x1a\n" +
+	"\bReplicas\x18\a \x01(\x05R\bReplicas\x1a9\n" +
+	"\vClassMethod\x12\x12\n" +
+	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x16\n" +
+	"\x06Params\x18\x02 \x03(\tR\x06Params\"\x9b\x01\n" +
 	"\tAppendArg\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x01(\tR\tSessionID\x12\x1e\n" +
 	"\n" +
 	"InstanceID\x18\x02 \x01(\tR\n" +
 	"InstanceID\x12\x12\n" +
 	"\x04Name\x18\x03 \x01(\tR\x04Name\x12\x14\n" +
+	"\x05Param\x18\x04 \x01(\tR\x05Param\x12&\n" +
+	"\x05Value\x18\x05 \x01(\v2\x10.controller.DataR\x05Value\"\xb2\x01\n" +
+	"\x14AppendClassMethodArg\x12\x1c\n" +
+	"\tSessionID\x18\x01 \x01(\tR\tSessionID\x12\x1e\n" +
+	"\n" +
+	"InstanceID\x18\x02 \x01(\tR\n" +
+	"InstanceID\x12\x1e\n" +
+	"\n" +
+	"MethodName\x18\x03 \x01(\tR\n" +
+	"MethodName\x12\x14\n" +
 	"\x05Param\x18\x04 \x01(\tR\x05Param\x12&\n" +
 	"\x05Value\x18\x05 \x01(\v2\x10.controller.DataR\x05Value\"Z\n" +
 	"\x06Invoke\x12\x1c\n" +
@@ -1597,7 +1880,7 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\x05Nodes\x18\x01 \x03(\v2\x13.controller.DAGNodeR\x05Nodes\"G\n" +
 	"\x0fMarkDAGNodeDone\x12\x16\n" +
 	"\x06NodeId\x18\x01 \x01(\tR\x06NodeId\x12\x1c\n" +
-	"\tSessionId\x18\x02 \x01(\tR\tSessionId\"\xa4\x05\n" +
+	"\tSessionId\x18\x02 \x01(\tR\tSessionId\"\xbf\x06\n" +
 	"\aMessage\x12+\n" +
 	"\x04Type\x18\x01 \x01(\x0e2\x17.controller.CommandTypeR\x04Type\x12#\n" +
 	"\x03Ack\x18\x02 \x01(\v2\x0f.controller.AckH\x00R\x03Ack\x12)\n" +
@@ -1606,29 +1889,34 @@ const file_controller_controller_proto_rawDesc = "" +
 	"AppendData\x18\x04 \x01(\v2\x16.controller.AppendDataH\x00R\n" +
 	"AppendData\x12;\n" +
 	"\vAppendActor\x18\x05 \x01(\v2\x17.controller.AppendActorH\x00R\vAppendActor\x12>\n" +
-	"\fAppendPyFunc\x18\x06 \x01(\v2\x18.controller.AppendPyFuncH\x00R\fAppendPyFunc\x125\n" +
-	"\tAppendArg\x18\a \x01(\v2\x15.controller.AppendArgH\x00R\tAppendArg\x12,\n" +
-	"\x06Invoke\x18\b \x01(\v2\x12.controller.InvokeH\x00R\x06Invoke\x12>\n" +
-	"\fReturnResult\x18\t \x01(\v2\x18.controller.ReturnResultH\x00R\fReturnResult\x12G\n" +
-	"\x0fRegisterRequest\x18\n" +
-	" \x01(\v2\x1b.controller.RegisterRequestH\x00R\x0fRegisterRequest\x12#\n" +
-	"\x03DAG\x18\v \x01(\v2\x0f.controller.DAGH\x00R\x03DAG\x12G\n" +
-	"\x0fMarkDAGNodeDone\x18\f \x01(\v2\x1b.controller.MarkDAGNodeDoneH\x00R\x0fMarkDAGNodeDoneB\t\n" +
-	"\aCommand*\xde\x01\n" +
+	"\fAppendPyFunc\x18\x06 \x01(\v2\x18.controller.AppendPyFuncH\x00R\fAppendPyFunc\x12A\n" +
+	"\rAppendPyClass\x18\a \x01(\v2\x19.controller.AppendPyClassH\x00R\rAppendPyClass\x125\n" +
+	"\tAppendArg\x18\b \x01(\v2\x15.controller.AppendArgH\x00R\tAppendArg\x12V\n" +
+	"\x14AppendClassMethodArg\x18\t \x01(\v2 .controller.AppendClassMethodArgH\x00R\x14AppendClassMethodArg\x12,\n" +
+	"\x06Invoke\x18\n" +
+	" \x01(\v2\x12.controller.InvokeH\x00R\x06Invoke\x12>\n" +
+	"\fReturnResult\x18\v \x01(\v2\x18.controller.ReturnResultH\x00R\fReturnResult\x12G\n" +
+	"\x0fRegisterRequest\x18\f \x01(\v2\x1b.controller.RegisterRequestH\x00R\x0fRegisterRequest\x12#\n" +
+	"\x03DAG\x18\r \x01(\v2\x0f.controller.DAGH\x00R\x03DAG\x12G\n" +
+	"\x0fMarkDAGNodeDone\x18\x0e \x01(\v2\x1b.controller.MarkDAGNodeDoneH\x00R\x0fMarkDAGNodeDoneB\t\n" +
+	"\aCommand*\xa5\x02\n" +
 	"\vCommandType\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03ACK\x10\x01\x12\f\n" +
 	"\bFR_READY\x10\x02\x12\x12\n" +
 	"\x0eFR_APPEND_DATA\x10\x03\x12\x13\n" +
 	"\x0fFR_APPEND_ACTOR\x10\x04\x12\x15\n" +
-	"\x11FR_APPEND_PY_FUNC\x10\x05\x12\x11\n" +
-	"\rFR_APPEND_ARG\x10\x06\x12\x14\n" +
-	"\x10BK_RETURN_RESULT\x10\a\x12\x17\n" +
-	"\x13FR_REGISTER_REQUEST\x10\b\x12\n" +
+	"\x11FR_APPEND_PY_FUNC\x10\x05\x12\x16\n" +
+	"\x12FR_APPEND_PY_CLASS\x10\x06\x12\x11\n" +
+	"\rFR_APPEND_ARG\x10\a\x12\x1e\n" +
+	"\x1aFR_APPEND_CLASS_METHOD_ARG\x10\b\x12\r\n" +
+	"\tFR_INVOKE\x10\t\x12\x14\n" +
+	"\x10BK_RETURN_RESULT\x10\n" +
+	"\x12\x17\n" +
+	"\x13FR_REGISTER_REQUEST\x10\v\x12\n" +
 	"\n" +
-	"\x06FR_DAG\x10\t\x12\x19\n" +
-	"\x15FR_MARK_DAG_NODE_DONE\x10\n" +
-	"2D\n" +
+	"\x06FR_DAG\x10\f\x12\x19\n" +
+	"\x15FR_MARK_DAG_NODE_DONE\x10\r2D\n" +
 	"\aService\x129\n" +
 	"\aSession\x12\x13.controller.Message\x1a\x13.controller.Message\"\x00(\x010\x01B+Z)github.com/9triver/ignis/proto/controllerb\x06proto3"
 
@@ -1645,66 +1933,74 @@ func file_controller_controller_proto_rawDescGZIP() []byte {
 }
 
 var file_controller_controller_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_controller_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_controller_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_controller_controller_proto_goTypes = []any{
-	(CommandType)(0),            // 0: controller.CommandType
-	(Data_ObjectType)(0),        // 1: controller.Data.ObjectType
-	(*Ack)(nil),                 // 2: controller.Ack
-	(*Ready)(nil),               // 3: controller.Ready
-	(*Data)(nil),                // 4: controller.Data
-	(*AppendData)(nil),          // 5: controller.AppendData
-	(*AppendActor)(nil),         // 6: controller.AppendActor
-	(*Resources)(nil),           // 7: controller.Resources
-	(*AppendPyFunc)(nil),        // 8: controller.AppendPyFunc
-	(*AppendArg)(nil),           // 9: controller.AppendArg
-	(*Invoke)(nil),              // 10: controller.Invoke
-	(*ReturnResult)(nil),        // 11: controller.ReturnResult
-	(*RegisterRequest)(nil),     // 12: controller.RegisterRequest
-	(*ControlNode)(nil),         // 13: controller.ControlNode
-	(*DataNode)(nil),            // 14: controller.DataNode
-	(*DAGNode)(nil),             // 15: controller.DAGNode
-	(*DAG)(nil),                 // 16: controller.DAG
-	(*MarkDAGNodeDone)(nil),     // 17: controller.MarkDAGNodeDone
-	(*Message)(nil),             // 18: controller.Message
-	nil,                         // 19: controller.ControlNode.ParamsEntry
-	(*proto.Flow)(nil),          // 20: proto.Flow
-	(*proto.EncodedObject)(nil), // 21: proto.EncodedObject
-	(*proto.ActorRef)(nil),      // 22: proto.ActorRef
-	(proto.Language)(0),         // 23: proto.Language
+	(CommandType)(0),                  // 0: controller.CommandType
+	(Data_ObjectType)(0),              // 1: controller.Data.ObjectType
+	(*Ack)(nil),                       // 2: controller.Ack
+	(*Ready)(nil),                     // 3: controller.Ready
+	(*Data)(nil),                      // 4: controller.Data
+	(*AppendData)(nil),                // 5: controller.AppendData
+	(*AppendActor)(nil),               // 6: controller.AppendActor
+	(*Resources)(nil),                 // 7: controller.Resources
+	(*AppendPyFunc)(nil),              // 8: controller.AppendPyFunc
+	(*AppendPyClass)(nil),             // 9: controller.AppendPyClass
+	(*AppendArg)(nil),                 // 10: controller.AppendArg
+	(*AppendClassMethodArg)(nil),      // 11: controller.AppendClassMethodArg
+	(*Invoke)(nil),                    // 12: controller.Invoke
+	(*ReturnResult)(nil),              // 13: controller.ReturnResult
+	(*RegisterRequest)(nil),           // 14: controller.RegisterRequest
+	(*ControlNode)(nil),               // 15: controller.ControlNode
+	(*DataNode)(nil),                  // 16: controller.DataNode
+	(*DAGNode)(nil),                   // 17: controller.DAGNode
+	(*DAG)(nil),                       // 18: controller.DAG
+	(*MarkDAGNodeDone)(nil),           // 19: controller.MarkDAGNodeDone
+	(*Message)(nil),                   // 20: controller.Message
+	(*AppendPyClass_ClassMethod)(nil), // 21: controller.AppendPyClass.ClassMethod
+	nil,                               // 22: controller.ControlNode.ParamsEntry
+	(*proto.Flow)(nil),                // 23: proto.Flow
+	(*proto.EncodedObject)(nil),       // 24: proto.EncodedObject
+	(*proto.ActorRef)(nil),            // 25: proto.ActorRef
+	(proto.Language)(0),               // 26: proto.Language
 }
 var file_controller_controller_proto_depIdxs = []int32{
 	1,  // 0: controller.Data.Type:type_name -> controller.Data.ObjectType
-	20, // 1: controller.Data.Ref:type_name -> proto.Flow
-	21, // 2: controller.Data.Encoded:type_name -> proto.EncodedObject
-	21, // 3: controller.AppendData.Object:type_name -> proto.EncodedObject
-	22, // 4: controller.AppendActor.Ref:type_name -> proto.ActorRef
-	23, // 5: controller.AppendPyFunc.Language:type_name -> proto.Language
+	23, // 1: controller.Data.Ref:type_name -> proto.Flow
+	24, // 2: controller.Data.Encoded:type_name -> proto.EncodedObject
+	24, // 3: controller.AppendData.Object:type_name -> proto.EncodedObject
+	25, // 4: controller.AppendActor.Ref:type_name -> proto.ActorRef
+	26, // 5: controller.AppendPyFunc.Language:type_name -> proto.Language
 	7,  // 6: controller.AppendPyFunc.Resources:type_name -> controller.Resources
-	4,  // 7: controller.AppendArg.Value:type_name -> controller.Data
-	4,  // 8: controller.ReturnResult.Value:type_name -> controller.Data
-	19, // 9: controller.ControlNode.Params:type_name -> controller.ControlNode.ParamsEntry
-	13, // 10: controller.DAGNode.ControlNode:type_name -> controller.ControlNode
-	14, // 11: controller.DAGNode.DataNode:type_name -> controller.DataNode
-	15, // 12: controller.DAG.Nodes:type_name -> controller.DAGNode
-	0,  // 13: controller.Message.Type:type_name -> controller.CommandType
-	2,  // 14: controller.Message.Ack:type_name -> controller.Ack
-	3,  // 15: controller.Message.Ready:type_name -> controller.Ready
-	5,  // 16: controller.Message.AppendData:type_name -> controller.AppendData
-	6,  // 17: controller.Message.AppendActor:type_name -> controller.AppendActor
-	8,  // 18: controller.Message.AppendPyFunc:type_name -> controller.AppendPyFunc
-	9,  // 19: controller.Message.AppendArg:type_name -> controller.AppendArg
-	10, // 20: controller.Message.Invoke:type_name -> controller.Invoke
-	11, // 21: controller.Message.ReturnResult:type_name -> controller.ReturnResult
-	12, // 22: controller.Message.RegisterRequest:type_name -> controller.RegisterRequest
-	16, // 23: controller.Message.DAG:type_name -> controller.DAG
-	17, // 24: controller.Message.MarkDAGNodeDone:type_name -> controller.MarkDAGNodeDone
-	18, // 25: controller.Service.Session:input_type -> controller.Message
-	18, // 26: controller.Service.Session:output_type -> controller.Message
-	26, // [26:27] is the sub-list for method output_type
-	25, // [25:26] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	21, // 7: controller.AppendPyClass.Methods:type_name -> controller.AppendPyClass.ClassMethod
+	26, // 8: controller.AppendPyClass.Language:type_name -> proto.Language
+	4,  // 9: controller.AppendArg.Value:type_name -> controller.Data
+	4,  // 10: controller.AppendClassMethodArg.Value:type_name -> controller.Data
+	4,  // 11: controller.ReturnResult.Value:type_name -> controller.Data
+	22, // 12: controller.ControlNode.Params:type_name -> controller.ControlNode.ParamsEntry
+	15, // 13: controller.DAGNode.ControlNode:type_name -> controller.ControlNode
+	16, // 14: controller.DAGNode.DataNode:type_name -> controller.DataNode
+	17, // 15: controller.DAG.Nodes:type_name -> controller.DAGNode
+	0,  // 16: controller.Message.Type:type_name -> controller.CommandType
+	2,  // 17: controller.Message.Ack:type_name -> controller.Ack
+	3,  // 18: controller.Message.Ready:type_name -> controller.Ready
+	5,  // 19: controller.Message.AppendData:type_name -> controller.AppendData
+	6,  // 20: controller.Message.AppendActor:type_name -> controller.AppendActor
+	8,  // 21: controller.Message.AppendPyFunc:type_name -> controller.AppendPyFunc
+	9,  // 22: controller.Message.AppendPyClass:type_name -> controller.AppendPyClass
+	10, // 23: controller.Message.AppendArg:type_name -> controller.AppendArg
+	11, // 24: controller.Message.AppendClassMethodArg:type_name -> controller.AppendClassMethodArg
+	12, // 25: controller.Message.Invoke:type_name -> controller.Invoke
+	13, // 26: controller.Message.ReturnResult:type_name -> controller.ReturnResult
+	14, // 27: controller.Message.RegisterRequest:type_name -> controller.RegisterRequest
+	18, // 28: controller.Message.DAG:type_name -> controller.DAG
+	19, // 29: controller.Message.MarkDAGNodeDone:type_name -> controller.MarkDAGNodeDone
+	20, // 30: controller.Service.Session:input_type -> controller.Message
+	20, // 31: controller.Service.Session:output_type -> controller.Message
+	31, // [31:32] is the sub-list for method output_type
+	30, // [30:31] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_controller_controller_proto_init() }
@@ -1716,22 +2012,24 @@ func file_controller_controller_proto_init() {
 		(*Data_Ref)(nil),
 		(*Data_Encoded)(nil),
 	}
-	file_controller_controller_proto_msgTypes[9].OneofWrappers = []any{
+	file_controller_controller_proto_msgTypes[11].OneofWrappers = []any{
 		(*ReturnResult_Value)(nil),
 		(*ReturnResult_Error)(nil),
 	}
-	file_controller_controller_proto_msgTypes[12].OneofWrappers = []any{}
-	file_controller_controller_proto_msgTypes[13].OneofWrappers = []any{
+	file_controller_controller_proto_msgTypes[14].OneofWrappers = []any{}
+	file_controller_controller_proto_msgTypes[15].OneofWrappers = []any{
 		(*DAGNode_ControlNode)(nil),
 		(*DAGNode_DataNode)(nil),
 	}
-	file_controller_controller_proto_msgTypes[16].OneofWrappers = []any{
+	file_controller_controller_proto_msgTypes[18].OneofWrappers = []any{
 		(*Message_Ack)(nil),
 		(*Message_Ready)(nil),
 		(*Message_AppendData)(nil),
 		(*Message_AppendActor)(nil),
 		(*Message_AppendPyFunc)(nil),
+		(*Message_AppendPyClass)(nil),
 		(*Message_AppendArg)(nil),
+		(*Message_AppendClassMethodArg)(nil),
 		(*Message_Invoke)(nil),
 		(*Message_ReturnResult)(nil),
 		(*Message_RegisterRequest)(nil),
@@ -1744,7 +2042,7 @@ func file_controller_controller_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_controller_controller_proto_rawDesc), len(file_controller_controller_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   18,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
