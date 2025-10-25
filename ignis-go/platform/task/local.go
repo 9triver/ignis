@@ -18,7 +18,7 @@ type LocalTaskHandler struct {
 }
 
 func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
-	if !h.ready() {
+	if !h.Ready() {
 		return errors.New("not ready")
 	}
 
@@ -63,7 +63,7 @@ func (h *LocalTaskHandler) Invoke(_ actor.Context, param string, value *proto.Fl
 	h.params[param] = value
 	h.deps.Remove(param)
 
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromFunction(sessionId string, store *actor.PID, f functions.Function) *LocalTaskHandler {
@@ -86,7 +86,7 @@ type ActorTaskHandler struct {
 }
 
 func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo string) error {
-	if !h.ready() {
+	if !h.Ready() {
 		return errors.New("not ready")
 	}
 
@@ -104,7 +104,7 @@ func (h *ActorTaskHandler) Invoke(ctx actor.Context, param string, value *proto.
 		Value:     value,
 	})
 	h.deps.Remove(param)
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromPID(sessionId string, store *actor.PID, params []string, pid *actor.PID) *ActorTaskHandler {
