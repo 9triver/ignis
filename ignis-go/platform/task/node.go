@@ -45,14 +45,11 @@ type Runtime struct {
 	handler Handler
 }
 
-func (rt *Runtime) Invoke(ctx actor.Context, param string, value *proto.Flow) error {
-	ready, err := rt.handler.Invoke(ctx, param, value)
-	if err != nil {
-		return err
-	}
+func (rt *Runtime) Start(ctx actor.Context) error {
+	return rt.handler.Start(ctx, rt.replyTo)
+}
 
-	if ready {
-		return rt.handler.Start(ctx, rt.replyTo)
-	}
-	return nil
+func (rt *Runtime) Invoke(ctx actor.Context, param string, value *proto.Flow) (err error) {
+	_, err = rt.handler.Invoke(ctx, param, value)
+	return
 }

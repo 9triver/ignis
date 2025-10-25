@@ -18,6 +18,10 @@ type LocalTaskHandler struct {
 }
 
 func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.ready() {
+		return errors.New("not ready")
+	}
+
 	futures := make(map[string]utils.Future[objects.Interface])
 	for param, flow := range h.params {
 		futures[param] = store.GetObject(ctx, h.store, flow)
@@ -82,6 +86,10 @@ type ActorTaskHandler struct {
 }
 
 func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.ready() {
+		return errors.New("not ready")
+	}
+
 	ctx.Send(h.pid, &proto.InvokeStart{
 		SessionID: h.sessionId,
 		ReplyTo:   replyTo,

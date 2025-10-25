@@ -58,6 +58,10 @@ type GroupedTaskHandler struct {
 }
 
 func (h *GroupedTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.ready() {
+		return errors.New("not ready")
+	}
+
 	if h.selected == nil {
 		return errors.New("no candidate actor selected")
 	}

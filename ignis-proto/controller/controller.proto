@@ -75,6 +75,12 @@ message AppendArg {
   Data Value = 5; // object ref for param
 }
 
+message Invoke {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of function instance under current execution session
+  string Name = 3; // function name
+}
+
 message ReturnResult {
   string SessionID = 1; // current execution session
   string InstanceID = 2; // id of function instance under current execution session
@@ -138,10 +144,11 @@ message Message {
     AppendActor AppendActor = 5;
     AppendPyFunc AppendPyFunc = 6;
     AppendArg AppendArg = 7;
-    ReturnResult ReturnResult = 8;
-    RegisterRequest RegisterRequest = 9;
-    DAG DAG = 10;
-    MarkDAGNodeDone MarkDAGNodeDone = 11;
+    Invoke Invoke = 8;
+    ReturnResult ReturnResult = 9;
+    RegisterRequest RegisterRequest = 10;
+    DAG DAG = 11;
+    MarkDAGNodeDone MarkDAGNodeDone = 12;
   }
 }
 

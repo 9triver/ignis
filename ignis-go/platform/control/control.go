@@ -116,6 +116,22 @@ func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData
 	})
 }
 
+func (c *Controller) getOrCreateRuntime(ctx actor.Context, name, sessionId, instanceId string) (*task.Runtime, error) {
+	runtimeId := fmt.Sprintf("%s::%s::%s", name, sessionId, instanceId)
+	rt, ok := c.runtimes[runtimeId]
+	if !ok {
+		node, ok := c.nodes[name]
+		if !ok {
+			return nil, errors.Format("actor node %s not found", name)
+		}
+
+		rt = node.Runtime(runtimeId, c.store.PID, c.id)
+		c.runtimes[runtimeId] = rt
+	}
+
+	return rt, nil
+}
+
 func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 	ctx.Logger().Info("control: append arg",
 		"name", arg.Name,
@@ -123,16 +139,16 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 		"session", arg.SessionID,
 		"instance", arg.InstanceID,
 	)
-	sessionId := fmt.Sprintf("%s::%s::%s", arg.Name, arg.SessionID, arg.InstanceID)
-	rt, ok := c.runtimes[sessionId]
-	if !ok {
-		node, ok := c.nodes[arg.Name]
-		if !ok {
-			return
-		}
 
-		rt = node.Runtime(sessionId, c.store.PID, c.id)
-		c.runtimes[sessionId] = rt
+	rt, err := c.getOrCreateRuntime(ctx, arg.Name, arg.SessionID, arg.InstanceID)
+	if err != nil {
+		ctx.Logger().Error("control: get runtime error",
+			"name", arg.Name,
+			"session", arg.SessionID,
+			"instance", arg.InstanceID,
+			"err", err,
+		)
+		return
 	}
 
 	switch v := arg.Value.Object.(type) {
@@ -167,6 +183,27 @@ func (c *Controller) onAppendArg(ctx actor.Context, arg *controller.AppendArg) {
 	}
 }
 
+func (c *Controller) onInvoke(ctx actor.Context, invoke *controller.Invoke) {
+	ctx.Logger().Info("control: invoke",
+		"name", invoke.Name,
+		"session", invoke.SessionID,
+		"instance", invoke.InstanceID,
+	)
+
+	rt, err := c.getOrCreateRuntime(ctx, invoke.Name, invoke.SessionID, invoke.InstanceID)
+	if err != nil {
+		ctx.Logger().Error("control: get runtime error",
+			"name", invoke.Name,
+			"session", invoke.SessionID,
+			"instance", invoke.InstanceID,
+			"err", err,
+		)
+		return
+	}
+
+	rt.Start(ctx)
+}
+
 func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
 	ctx.Logger().Info("control: append DAG",
 		"node num", len(dag.Nodes),
@@ -184,24 +221,16 @@ func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.M
 }
 
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
-	// jsonBytes, _ := json.Marshal(msg.Command)
-	// logrus.Info("control: onControllerMessage ", string(jsonBytes))
-
 	switch cmd := msg.Command.(type) {
-	// case *controller.Message_AppendActor:
-
-	// 	c.onAppendActor(ctx, cmd.AppendActor)
 	case *controller.Message_AppendPyFunc:
 		c.onAppendPyFunc(ctx, cmd.AppendPyFunc)
 	case *controller.Message_AppendData:
 		c.onAppendData(ctx, cmd.AppendData)
 	case *controller.Message_AppendArg:
 		c.onAppendArg(ctx, cmd.AppendArg)
+	case *controller.Message_Invoke:
+		c.onInvoke(ctx, cmd.Invoke)
 	case *controller.Message_DAG:
-		// jsonBytes, _ := json.Marshal(cmd.DAG)
-		// logrus.Info("control: onDAG",
-		// 	"dag", string(jsonBytes),
-		// )
 		c.onDAG(ctx, cmd.DAG)
 	case *controller.Message_MarkDAGNodeDone:
 		c.onMarkDAGNodeDone(ctx, cmd.MarkDAGNodeDone)
@@ -244,7 +273,7 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeResponse) {
 				"sessionId", sessionId,
 			)
 			c.appInfo.MarkNodeDone(controlNodeID)
-			
+
 			// Also mark the output DataNode as done if it exists
 			if outputDataNodeID != "" {
 				ctx.Logger().Info("control: auto-marking output DataNode done",
