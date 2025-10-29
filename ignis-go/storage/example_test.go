@@ -127,8 +127,8 @@ func (m *MockStorage) ObjectExists(ctx context.Context, bucket, key string) (boo
 	return false, nil
 }
 
-// ExampleBasicOperations demonstrates basic storage operations
-func ExampleBasicOperations() {
+// Example demonstrates basic storage operations
+func Example() {
 	ctx := context.Background()
 	store := NewMockStorage()
 
@@ -157,8 +157,8 @@ func ExampleBasicOperations() {
 	// Output: Hello, Storage!
 }
 
-// ExampleErrorHandling demonstrates error handling
-func ExampleErrorHandling() {
+// Example_errorHandling demonstrates error handling
+func Example_errorHandling() {
 	ctx := context.Background()
 	store := NewMockStorage()
 
@@ -182,8 +182,8 @@ func ExampleErrorHandling() {
 	// Error code: BucketNotFound
 }
 
-// ExampleListObjects demonstrates listing objects
-func ExampleListObjects() {
+// Example_listObjects demonstrates listing objects
+func Example_listObjects() {
 	ctx := context.Background()
 	store := NewMockStorage()
 
@@ -224,8 +224,8 @@ func ExampleListObjects() {
 	// - data/file2.txt (8 bytes)
 }
 
-// ExampleUtilityFunctions demonstrates utility functions
-func ExampleUtilityFunctions() {
+// Example_utilityFunctions demonstrates utility functions
+func Example_utilityFunctions() {
 	// Validate bucket name
 	err := storage.ValidateBucketName("my-bucket")
 	fmt.Printf("Valid bucket: %v\n", err == nil)
@@ -254,8 +254,8 @@ func ExampleUtilityFunctions() {
 	// Content type: image/jpeg
 }
 
-// ExampleStreamOperations demonstrates stream conversion
-func ExampleStreamOperations() {
+// Example_streamOperations demonstrates stream conversion
+func Example_streamOperations() {
 	ctx := context.Background()
 
 	// Convert io.Reader to ignis Stream
@@ -266,8 +266,8 @@ func ExampleStreamOperations() {
 	// Output: Stream created: true
 }
 
-// ExampleCopyObject demonstrates copying objects
-func ExampleCopyObject() {
+// Example_copyObject demonstrates copying objects
+func Example_copyObject() {
 	ctx := context.Background()
 	store := NewMockStorage()
 
@@ -300,8 +300,8 @@ func ExampleCopyObject() {
 	// Output: Original content
 }
 
-// ExampleValidation demonstrates input validation
-func ExampleValidation() {
+// Example_validation demonstrates input validation
+func Example_validation() {
 	// Invalid bucket names
 	err := storage.ValidateBucketName("My-Bucket") // uppercase not allowed
 	fmt.Printf("Uppercase error: %v\n", err != nil)
@@ -323,8 +323,8 @@ func ExampleValidation() {
 	// Leading slash error: true
 }
 
-// ExampleCalculatePartSize demonstrates multipart calculations
-func ExampleCalculatePartSize() {
+// Example_calculatePartSize demonstrates multipart calculations
+func Example_calculatePartSize() {
 	// Small file
 	size := storage.CalculatePartSize(10 * 1024 * 1024) // 10MB
 	fmt.Printf("10MB file: %dMB per part\n", size/(1024*1024))
