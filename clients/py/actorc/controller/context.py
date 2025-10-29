@@ -405,7 +405,6 @@ class ActorExecutor(Executor):
                         NodeId=node.metadata()["id"],
                     ),
                 )
-                print(1)
                 actorContext.send(message)
             if _end:
                 break
