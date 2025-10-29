@@ -11,11 +11,14 @@ enum CommandType {
   FR_APPEND_DATA = 3; // frontend: append data node
   FR_APPEND_ACTOR = 4; // front: append actor (for debugging purpose)
   FR_APPEND_PY_FUNC = 5; // frontend: append python function (control node definition)
-  FR_APPEND_ARG = 6; // frontend: append function arg to specified actor
-  BK_RETURN_RESULT = 7; // backend: send back execution result
-  FR_REGISTER_REQUEST = 8; // backend: register application
-  FR_DAG = 9; // frontend: send DAG structure
-  FR_MARK_DAG_NODE_DONE = 10; // frontend: notify DAG node done
+  FR_APPEND_PY_CLASS = 6; // frontend: append python class (control node definition)
+  FR_APPEND_ARG = 7; // frontend: append function arg to specified actor
+  FR_APPEND_CLASS_METHOD_ARG = 8; // frontend: append class method arg to specified actor
+  FR_INVOKE = 9;
+  BK_RETURN_RESULT = 10; // backend: send back execution result
+  FR_REGISTER_REQUEST = 11; // backend: register application
+  FR_DAG = 12; // frontend: send DAG structure
+  FR_MARK_DAG_NODE_DONE = 13; // frontend: notify DAG node done
 }
 
 message Ack {
@@ -67,12 +70,42 @@ message AppendPyFunc {
   int32 Replicas = 8; // number of replicas
 }
 
+message AppendPyClass {
+  message ClassMethod {
+    string Name = 1;
+    repeated string Params = 2;
+  }
+
+  string Name = 1; // class name
+  repeated ClassMethod Methods = 2;
+  string Venv = 3; // function virtual environment
+  repeated string Requirements = 4; // function dependencies
+  bytes PickledObject = 5; // encoded function impl
+  proto.Language Language = 6; // return type of function
+  // TODO: Resources
+  int32 Replicas = 7;
+}
+
 message AppendArg {
   string SessionID = 1; // current execution session
   string InstanceID = 2; // id of function instance under current execution session
   string Name = 3; // function name
   string Param = 4; // param name
   Data Value = 5; // object ref for param
+}
+
+message AppendClassMethodArg {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of **class** instance under current execution session
+  string MethodName = 3; // method name
+  string Param = 4; // param name
+  Data Value = 5; // object ref for param
+}
+
+message Invoke {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of function instance under current execution session
+  string Name = 3; // function name
 }
 
 message ReturnResult {
@@ -137,11 +170,14 @@ message Message {
     AppendData AppendData = 4;
     AppendActor AppendActor = 5;
     AppendPyFunc AppendPyFunc = 6;
-    AppendArg AppendArg = 7;
-    ReturnResult ReturnResult = 8;
-    RegisterRequest RegisterRequest = 9;
-    DAG DAG = 10;
-    MarkDAGNodeDone MarkDAGNodeDone = 11;
+    AppendPyClass AppendPyClass = 7;
+    AppendArg AppendArg = 8;
+    AppendClassMethodArg AppendClassMethodArg = 9;
+    Invoke Invoke = 10;
+    ReturnResult ReturnResult = 11;
+    RegisterRequest RegisterRequest = 12;
+    DAG DAG = 13;
+    MarkDAGNodeDone MarkDAGNodeDone = 14;
   }
 }
 

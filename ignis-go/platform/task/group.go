@@ -58,6 +58,10 @@ type GroupedTaskHandler struct {
 }
 
 func (h *GroupedTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.Ready() {
+		return errors.New("not ready")
+	}
+
 	if h.selected == nil {
 		return errors.New("no candidate actor selected")
 	}
@@ -85,9 +89,9 @@ func (h *GroupedTaskHandler) Invoke(ctx actor.Context, param string, value *prot
 		Value:     value,
 	})
 
-	ctx.Logger().Debug("task: invoke grouped task", "deps", h.deps, "ready", h.ready())
+	ctx.Logger().Debug("task: invoke grouped task", "deps", h.deps, "ready", h.Ready())
 
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromActorGroup(sessionId string, store *actor.PID, params []string, group *ActorGroup) *GroupedTaskHandler {

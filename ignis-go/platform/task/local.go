@@ -18,6 +18,10 @@ type LocalTaskHandler struct {
 }
 
 func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.Ready() {
+		return errors.New("not ready")
+	}
+
 	futures := make(map[string]utils.Future[objects.Interface])
 	for param, flow := range h.params {
 		futures[param] = store.GetObject(ctx, h.store, flow)
@@ -59,7 +63,7 @@ func (h *LocalTaskHandler) Invoke(_ actor.Context, param string, value *proto.Fl
 	h.params[param] = value
 	h.deps.Remove(param)
 
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromFunction(sessionId string, store *actor.PID, f functions.Function) *LocalTaskHandler {
@@ -82,6 +86,10 @@ type ActorTaskHandler struct {
 }
 
 func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.Ready() {
+		return errors.New("not ready")
+	}
+
 	ctx.Send(h.pid, &proto.InvokeStart{
 		SessionID: h.sessionId,
 		ReplyTo:   replyTo,
@@ -96,7 +104,7 @@ func (h *ActorTaskHandler) Invoke(ctx actor.Context, param string, value *proto.
 		Value:     value,
 	})
 	h.deps.Remove(param)
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromPID(sessionId string, store *actor.PID, params []string, pid *actor.PID) *ActorTaskHandler {

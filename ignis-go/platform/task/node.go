@@ -1,6 +1,8 @@
 package task
 
 import (
+	"sync"
+
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/functions"
@@ -17,6 +19,7 @@ func (node *Node) Runtime(sessionId string, store *actor.PID, replyTo string) *R
 	return &Runtime{
 		replyTo: replyTo,
 		handler: node.producer(sessionId, store),
+		cond:    sync.NewCond(&sync.Mutex{}),
 	}
 }
 
@@ -43,16 +46,30 @@ func NodeFromActorGroup(id string, params []string, group *ActorGroup) *Node {
 type Runtime struct {
 	replyTo string
 	handler Handler
+	cond    *sync.Cond
 }
 
-func (rt *Runtime) Invoke(ctx actor.Context, param string, value *proto.Flow) error {
+func (rt *Runtime) Start(ctx actor.Context) error {
+	rt.cond.L.Lock()
+	for !rt.handler.Ready() {
+		rt.cond.Wait()
+	}
+	rt.cond.L.Unlock()
+
+	return rt.handler.Start(ctx, rt.replyTo)
+}
+
+func (rt *Runtime) Invoke(ctx actor.Context, param string, value *proto.Flow) (err error) {
 	ready, err := rt.handler.Invoke(ctx, param, value)
 	if err != nil {
 		return err
 	}
 
 	if ready {
-		return rt.handler.Start(ctx, rt.replyTo)
+		rt.cond.L.Lock()
+		rt.cond.Signal()
+		rt.cond.L.Unlock()
 	}
-	return nil
+
+	return
 }
