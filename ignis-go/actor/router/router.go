@@ -62,7 +62,7 @@ func (r *Router) Send(ctx Context, targetId string, msg any) {
 		}
 	}
 
-	ctx.Logger().Debug("route message to target", "targetId", targetId, "pid", pid, "msg", msg)
+	// ctx.Logger().Debug("route message to target", "targetId", targetId, "pid", pid, "msg", msg)
 	ctx.Send(pid, msg)
 }
 

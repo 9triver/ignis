@@ -86,7 +86,8 @@ func (s *Actor) onObjectResponse(ctx actor.Context, resp *cluster.ObjectResponse
 	if !encoded.Stream {
 		fut.Resolve(encoded)
 	} else {
-		ls := objects.NewStream(nil, encoded.Language)
+		// ls := objects.NewStream(nil, encoded.Language)
+		ls := objects.StreamWithID(resp.ID, nil, encoded.Language)
 		fut.Resolve(ls)
 	}
 }
@@ -263,6 +264,13 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 	props := actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
 		case *ObjectResponse:
+			ctx.Logger().Info("store: flow response",
+				"id", flow.ID,
+				"value", msg.Value,
+				"valueID", msg.Value.GetID(),
+				"error", msg.Error,
+			)
+
 			if msg.Error != nil {
 				fut.Reject(errors.WrapWith(msg.Error, "flow %s fetch failed", flow.ID))
 				return
@@ -275,10 +283,19 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 			}
 
 			fut.Resolve(msg.Value)
+			// TODO need exit?
 		}
 	})
 
-	flowActor := ctx.Spawn(props)
+	flowActor, err := ctx.SpawnNamed(props, "flow."+flow.ID)
+	if err != nil {
+		ctx.Logger().Error("store: flow spawn failed",
+			"id", flow.ID,
+			"error", err,
+		)
+		fut.Reject(errors.WrapWith(err, "flow %s spawn failed", flow.ID))
+		return fut
+	}
 	ctx.Send(store, &RequestObject{
 		ReplyTo: flowActor,
 		Flow:    flow,
