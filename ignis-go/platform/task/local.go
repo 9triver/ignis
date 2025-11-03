@@ -5,7 +5,7 @@ import (
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/store"
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
@@ -22,12 +22,12 @@ func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
 		return errors.New("not ready")
 	}
 
-	futures := make(map[string]utils.Future[objects.Interface])
+	futures := make(map[string]utils.Future[object.Interface])
 	for param, flow := range h.params {
 		futures[param] = store.GetObject(ctx, h.store, flow)
 	}
 
-	invoke := make(map[string]objects.Interface)
+	invoke := make(map[string]object.Interface)
 	for param, fut := range futures {
 		obj, err := fut.Result()
 		if err != nil {

@@ -12,12 +12,12 @@ import (
 
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote/ipc"
-	"github.com/9triver/ignis/actor/remote/rpc"
-	"github.com/9triver/ignis/actor/remote/stub"
+	"github.com/9triver/ignis/transport/ipc"
+	"github.com/9triver/ignis/transport/rpc"
+	"github.com/9triver/ignis/transport/stub"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -36,10 +36,10 @@ func rpcClient(computeRef *proto.ActorRef) {
 		panic(err)
 	}
 
-	err = stream.Send(controller.NewAppendData("session-0", &objects.Remote{
+	err = stream.Send(controller.NewAppendData("session-0", &object.Remote{
 		ID:       "obj-1",
 		Data:     []byte("123456"),
-		Language: objects.LangJson,
+		Language: object.LangJson,
 	}))
 	if err != nil {
 		panic(err)
@@ -58,7 +58,7 @@ func rpcClient(computeRef *proto.ActorRef) {
 		panic(err)
 	}
 
-	encoded, _ := objects.NewLocal(10, objects.LangJson).Encode()
+	encoded, _ := object.NewLocal(10, object.LangJson).Encode()
 	err = stream.Send(controller.NewAppendArgFromEncoded("session-0", "instance-0", "func", "B", encoded))
 	if err != nil {
 		panic(err)
@@ -93,7 +93,7 @@ func TestRemoteTask(t *testing.T) {
 
 	taskFunc := functions.NewGo("graph-task", func(args Input) (ret int, err error) {
 		return args.A + args.B, nil
-	}, objects.LangJson)
+	}, object.LangJson)
 	computePID := sys.Root.Spawn(compute.NewActor("graph-task", taskFunc, storeRef.PID))
 
 	go func() {

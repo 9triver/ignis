@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 )
 
 const (
@@ -224,7 +224,7 @@ func ShouldUseMultipart(size int64) bool {
 
 // StreamToReader converts an ignis Stream to an io.Reader.
 // This is useful for integrating ignis streams with standard Go I/O operations.
-func StreamToReader(stream objects.Interface) (io.Reader, error) {
+func StreamToReader(stream object.Interface) (io.Reader, error) {
 	if stream == nil {
 		return nil, NewStorageError(ErrCodeInvalidParameter, "stream is nil")
 	}
@@ -236,7 +236,7 @@ func StreamToReader(stream objects.Interface) (io.Reader, error) {
 	}
 
 	// If the value is already a channel, create a reader from it
-	ch, ok := value.(<-chan objects.Interface)
+	ch, ok := value.(<-chan object.Interface)
 	if !ok {
 		return nil, NewStorageError(ErrCodeInvalidParameter, "stream value is not a channel")
 	}
@@ -246,7 +246,7 @@ func StreamToReader(stream objects.Interface) (io.Reader, error) {
 
 // streamReader implements io.Reader for ignis streams.
 type streamReader struct {
-	ch      <-chan objects.Interface
+	ch      <-chan object.Interface
 	current []byte
 	offset  int
 	closed  bool
@@ -295,13 +295,13 @@ func (r *streamReader) Read(p []byte) (n int, err error) {
 }
 
 // ReaderToIgnisStream converts an io.Reader to an ignis Stream.
-// It reads from the reader in chunks and creates a stream of objects.
-func ReaderToIgnisStream(ctx context.Context, reader io.Reader, chunkSize int, language objects.Language) objects.Interface {
+// It reads from the reader in chunks and creates a stream of object.
+func ReaderToIgnisStream(ctx context.Context, reader io.Reader, chunkSize int, language object.Language) object.Interface {
 	if chunkSize <= 0 {
 		chunkSize = DefaultChunkSize
 	}
 
-	ch := make(chan objects.Interface, 10)
+	ch := make(chan object.Interface, 10)
 
 	go func() {
 		defer close(ch)
@@ -319,7 +319,7 @@ func ReaderToIgnisStream(ctx context.Context, reader io.Reader, chunkSize int, l
 					copy(data, buffer[:n])
 
 					// Send as ignis object
-					obj := objects.NewLocal(data, language)
+					obj := object.NewLocal(data, language)
 					select {
 					case ch <- obj:
 					case <-ctx.Done():
@@ -338,7 +338,7 @@ func ReaderToIgnisStream(ctx context.Context, reader io.Reader, chunkSize int, l
 		}
 	}()
 
-	return objects.NewStream(ch, language)
+	return object.NewStream(ch, language)
 }
 
 // CopyObject is a helper function to copy an object within the same storage.

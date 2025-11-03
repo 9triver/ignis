@@ -1,4 +1,4 @@
-package remote
+package transport
 
 import (
 	pb "google.golang.org/protobuf/proto"

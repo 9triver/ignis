@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/storage"
 )
 
@@ -260,7 +260,7 @@ func Example_streamOperations() {
 
 	// Convert io.Reader to ignis Stream
 	reader := strings.NewReader("Hello from stream")
-	stream := storage.ReaderToIgnisStream(ctx, reader, 1024, objects.LangGo)
+	stream := storage.ReaderToIgnisStream(ctx, reader, 1024, object.LangGo)
 
 	fmt.Printf("Stream created: %v\n", stream != nil)
 	// Output: Stream created: true

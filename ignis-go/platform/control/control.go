@@ -9,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote"
+	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -22,7 +22,7 @@ import (
 type Controller struct {
 	id         string
 	manager    *functions.VenvManager
-	controller remote.Controller
+	controller transport.Controller
 	store      *proto.StoreRef
 	appID      string
 	appInfo    ApplicationInfo
@@ -232,7 +232,7 @@ func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controlle
 			ID:  c.store.ID,
 			PID: c.store.PID,
 		},
-	}).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
+	}).OnDone(func(obj object.Interface, duration time.Duration, err error) {
 		if err != nil {
 			ctx.Logger().Error("control: request object error",
 				"id", requestObject.ID,
@@ -343,7 +343,7 @@ func SpawnTaskController(
 	ctx *actor.RootContext,
 	store *proto.StoreRef,
 	venvs *functions.VenvManager,
-	cm remote.ControllerManager,
+	cm transport.ControllerManager,
 	onClose func(),
 ) *proto.ActorRef {
 	c := cm.NextController()
@@ -381,7 +381,7 @@ type ApplicationInfo interface {
 
 // For iarnet
 func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.Deployer,
-	appInfo ApplicationInfo, c remote.Controller, onClose func()) *proto.ActorRef {
+	appInfo ApplicationInfo, c transport.Controller, onClose func()) *proto.ActorRef {
 
 	store := store.Spawn(ctx, nil, "store-"+appID)
 

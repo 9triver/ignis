@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote/ipc"
+	"github.com/9triver/ignis/transport/ipc"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 )
 
 func TestVenvExecutor(t *testing.T) {
@@ -53,9 +53,9 @@ func TestVenvExecutor(t *testing.T) {
 }
 
 func testDirect(t *testing.T, env *functions.VirtualEnv) {
-	params := make(map[string]objects.Interface)
-	params["a"] = objects.NewLocal(10, objects.LangJson)
-	params["b"] = objects.NewLocal(2, objects.LangJson)
+	params := make(map[string]object.Interface)
+	params["a"] = object.NewLocal(10, object.LangJson)
+	params["b"] = object.NewLocal(2, object.LangJson)
 	fut := env.Execute("__add", "call", params)
 	ret, err := fut.Result()
 	t.Log(ret, err)
@@ -69,20 +69,20 @@ func testJoin(t *testing.T, env *functions.VirtualEnv) {
 			ints <- i
 		}
 	}()
-	params := make(map[string]objects.Interface)
-	params["ints"] = objects.NewStream(ints, objects.LangJson)
+	params := make(map[string]object.Interface)
+	params["ints"] = object.NewStream(ints, object.LangJson)
 	fut := env.Execute("__sum", "call", params)
 	ret, err := fut.Result()
 	t.Log(ret, err)
 }
 
 func testStream(t *testing.T, env *functions.VirtualEnv) {
-	params := make(map[string]objects.Interface)
-	params["n"] = objects.NewLocal(10, objects.LangJson)
+	params := make(map[string]object.Interface)
+	params["n"] = object.NewLocal(10, object.LangJson)
 	fut := env.Execute("__gen", "call", params)
 	ret, _ := fut.Result()
 
-	s := ret.(*objects.Stream)
+	s := ret.(*object.Stream)
 	for obj := range s.ToChan() {
 		t.Log(obj)
 	}
@@ -96,12 +96,12 @@ func testMap(t *testing.T, env *functions.VirtualEnv) {
 			ints <- i
 		}
 	}()
-	params := make(map[string]objects.Interface)
-	params["ints"] = objects.NewStream(ints, objects.LangJson)
+	params := make(map[string]object.Interface)
+	params["ints"] = object.NewStream(ints, object.LangJson)
 	fut := env.Execute("__map", "call", params)
 	ret, _ := fut.Result()
 
-	s := ret.(*objects.Stream)
+	s := ret.(*object.Stream)
 	for obj := range s.ToChan() {
 		t.Log(obj)
 	}

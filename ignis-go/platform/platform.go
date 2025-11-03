@@ -1,3 +1,5 @@
+// Package platform 提供了 Ignis 平台的核心实现
+// 负责管理应用生命周期、任务调度、通信管理和状态监控
 package platform
 
 import (
@@ -10,92 +12,170 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote"
-	"github.com/9triver/ignis/actor/remote/ipc"
-	"github.com/9triver/ignis/actor/remote/rpc"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
+	"github.com/9triver/ignis/transport"
+	"github.com/9triver/ignis/transport/ipc"
+	"github.com/9triver/ignis/transport/rpc"
 	"github.com/9triver/ignis/utils"
 )
 
+// Platform 是 Ignis 平台的核心结构
+// 负责管理整个平台的运行，包括：
+//   - Actor 系统管理
+//   - 控制器和执行器连接管理
+//   - 应用注册和生命周期管理
+//   - 任务部署和调度
 type Platform struct {
-	// Root context of platform
-	ctx context.Context
-	// Main actor system of the platform
-	sys *actor.ActorSystem
-	// Control connection manager
-	cm remote.ControllerManager
-	// Executor connection manager
-	em remote.ExecutorManager
-	// Deployer
-	dp task.Deployer
-	// Application infos
-	appInfos map[string]*ApplicationInfo
-	// Controller actor refs
-	controllerActorRefs map[string]*proto.ActorRef
+	ctx                 context.Context             // 平台根上下文
+	sys                 *actor.ActorSystem          // Actor 系统
+	cm                  transport.ControllerManager // 控制器连接管理器
+	em                  transport.ExecutorManager   // 执行器连接管理器
+	dp                  task.Deployer               // 任务部署器
+	appInfos            map[string]*ApplicationInfo // 应用信息映射表
+	controllerActorRefs map[string]*proto.ActorRef  // 控制器 Actor 引用映射表
+	mu                  sync.RWMutex                // 保护应用信息的读写锁
 }
 
+// Run 启动平台并阻塞运行
+// 返回值:
+//   - error: 运行过程中的错误
+//
+// 执行流程:
+//  1. 启动控制器管理器（处理客户端连接）
+//  2. 启动执行器管理器（处理 Python 执行器连接）
+//  3. 启动客户端注册循环（处理应用注册请求）
+//  4. 等待 context 取消
+//
+// 注意: 该方法会阻塞直到 context 取消
 func (p *Platform) Run() error {
 	ctx, cancel := context.WithCancel(p.ctx)
 	defer cancel()
 
+	// 启动控制器管理器
 	go func() {
 		logrus.Infof("Controller Manager listening on %s", p.cm.Addr())
 		if err := p.cm.Run(ctx); err != nil {
-			panic(err)
+			logrus.Errorf("Controller Manager error: %v", err)
+			cancel()
 		}
 	}()
 
+	// 启动执行器管理器
 	go func() {
 		logrus.Infof("Executor Manager listening on %s", p.em.Addr())
 		if err := p.em.Run(ctx); err != nil {
-			panic(err)
+			logrus.Errorf("Executor Manager error: %v", err)
+			cancel()
 		}
 	}()
 
-	go func() {
-		logrus.Info("Waiting for new client connection...")
-		for {
-			ctrlr := p.cm.NextController()
-			if ctrlr == nil {
-				continue
-			}
-			logrus.Info("New client is connected")
-			msg := <-ctrlr.RecvChan()
-			if msg.Type == controller.CommandType_FR_REGISTER_REQUEST {
-				req := msg.GetRegisterRequest()
-				if req == nil {
-					logrus.Error("Register request is nil")
-					continue
-				}
-				appID := req.GetApplicationID()
-				if _, ok := p.appInfos[appID]; ok {
-					logrus.Errorf("Application ID %s is conflicted", appID)
-					continue
-				}
-				appInfo := NewApplicationInfo(appID)
-				actorRef := control.SpawnTaskControllerV2(p.sys.Root, appID, p.dp, appInfo, ctrlr, func() {
-					// delete(p.appInfos, appID)
-				})
-				p.appInfos[appID] = appInfo
-				p.controllerActorRefs[appID] = actorRef
-				logrus.Infof("Application %s is registered", appID)
-
-				ack := controller.NewAck(nil)
-				ctrlr.SendChan() <- ack
-			} else {
-				logrus.Errorf("The first message %s is not register request", msg.Type)
-			}
-		}
-	}()
+	// 启动客户端注册循环
+	go p.handleClientRegistrations(ctx)
 
 	<-ctx.Done()
 	return ctx.Err()
 }
 
+// handleClientRegistrations 处理客户端注册请求
+// 参数:
+//   - ctx: 上下文
+//
+// 该方法持续监听新的控制器连接，处理应用注册请求
+func (p *Platform) handleClientRegistrations(ctx context.Context) {
+	logrus.Info("Waiting for new client connection...")
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		ctrlr := p.cm.NextController()
+		if ctrlr == nil {
+			continue
+		}
+
+		logrus.Info("New client is connected")
+		if err := p.registerApplication(ctrlr); err != nil {
+			logrus.Errorf("Failed to register application: %v", err)
+		}
+	}
+}
+
+// registerApplication 处理单个应用的注册
+// 参数:
+//   - ctrlr: 控制器连接
+//
+// 返回值:
+//   - error: 注册错误
+func (p *Platform) registerApplication(ctrlr transport.Controller) error {
+	msg := <-ctrlr.RecvChan()
+
+	if msg.Type != controller.CommandType_FR_REGISTER_REQUEST {
+		logrus.Errorf("The first message %s is not register request", msg.Type)
+		return nil
+	}
+
+	req := msg.GetRegisterRequest()
+	if req == nil {
+		logrus.Error("Register request is nil")
+		return nil
+	}
+
+	appID := req.GetApplicationID()
+
+	// 检查应用 ID 是否冲突
+	p.mu.RLock()
+	_, exists := p.appInfos[appID]
+	p.mu.RUnlock()
+
+	if exists {
+		logrus.Errorf("Application ID %s is conflicted", appID)
+		return nil
+	}
+
+	// 创建应用信息和控制器 Actor
+	appInfo := NewApplicationInfo(appID)
+	actorRef := control.SpawnTaskControllerV2(p.sys.Root, appID, p.dp, appInfo, ctrlr, func() {
+		// 清理应用信息
+		p.mu.Lock()
+		delete(p.appInfos, appID)
+		delete(p.controllerActorRefs, appID)
+		p.mu.Unlock()
+	})
+
+	p.mu.Lock()
+	p.appInfos[appID] = appInfo
+	p.controllerActorRefs[appID] = actorRef
+	p.mu.Unlock()
+
+	logrus.Infof("Application %s is registered", appID)
+
+	// 发送确认消息
+	ack := controller.NewAck(nil)
+	ctrlr.SendChan() <- ack
+
+	return nil
+}
+
+// NewPlatform 创建一个新的平台实例
+// 参数:
+//   - ctx: 平台根上下文
+//   - rpcAddr: RPC 服务器监听地址（用于客户端连接）
+//   - dp: 任务部署器（如果为 nil，会创建默认的虚拟环境部署器）
+//
+// 返回值:
+//   - *Platform: 平台实例
+//
+// 初始化内容:
+//  1. 创建 Actor 系统
+//  2. 创建 IPC 执行器管理器（用于 Python 执行器）
+//  3. 创建 RPC 控制器管理器（用于客户端）
+//  4. 如果未提供部署器，创建默认的虚拟环境管理器
 func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platform {
 	opt := utils.WithLogger()
 	ipcAddr := "ipc://" + path.Join(configs.StoragePath, "em-ipc")
@@ -108,7 +188,6 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 		if err != nil {
 			panic(err)
 		}
-
 		dp = task.NewVenvMgrDeployer(vm)
 	}
 
@@ -123,55 +202,79 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 	}
 }
 
-// GetControllerActorRef returns the actor ref of the controller of the application.
+// GetApplicationDAG 获取指定应用的 DAG（有向无环图）
+// 参数:
+//   - appID: 应用标识符
+//
+// 返回值:
+//   - *controller.DAG: 应用的 DAG，如果应用不存在则返回 nil
 func (p *Platform) GetApplicationDAG(appID string) *controller.DAG {
 	logrus.Infof("GetApplicationDAG: %s", appID)
-	logrus.Infof("appInfos: %v", p.appInfos)
-	if _, ok := p.appInfos[appID]; !ok {
+
+	p.mu.RLock()
+	appInfo, ok := p.appInfos[appID]
+	p.mu.RUnlock()
+
+	if !ok {
 		return nil
 	}
-	return p.appInfos[appID].GetDAG()
+	return appInfo.GetDAG()
 }
 
-// GetApplicationInfo returns the ApplicationInfo for the given application ID
+// GetApplicationInfo 获取指定应用的信息
+// 参数:
+//   - appID: 应用标识符
+//
+// 返回值:
+//   - *ApplicationInfo: 应用信息，如果应用不存在则返回 nil
 func (p *Platform) GetApplicationInfo(appID string) *ApplicationInfo {
-	if appInfo, ok := p.appInfos[appID]; ok {
-		return appInfo
-	}
-	return nil
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.appInfos[appID]
 }
 
-// NodeState represents the state of a DAG node
+// NodeState 表示 DAG 节点的状态
 type NodeState struct {
-	ID       string    `json:"id"`
-	Type     string    `json:"type"` // "control" or "data"
-	Done     bool      `json:"done"`
-	Ready    bool      `json:"ready"`
-	UpdateAt time.Time `json:"updateAt"`
+	ID       string    `json:"id"`       // 节点 ID
+	Type     string    `json:"type"`     // 节点类型: "control" 或 "data"
+	Done     bool      `json:"done"`     // 是否已完成
+	Ready    bool      `json:"ready"`    // 是否已就绪
+	UpdateAt time.Time `json:"updateAt"` // 最后更新时间
 }
 
-// DAGStateChangeEvent represents a DAG state change event
+// DAGStateChangeEvent 表示 DAG 状态变更事件
+// 当 DAG 中的节点状态发生变化时，会生成该事件并通知观察者
 type DAGStateChangeEvent struct {
-	AppID     string     `json:"appId"`
-	NodeID    string     `json:"nodeId"`
-	NodeState *NodeState `json:"nodeState"`
-	Timestamp time.Time  `json:"timestamp"`
+	AppID     string     `json:"appId"`     // 应用 ID
+	NodeID    string     `json:"nodeId"`    // 节点 ID
+	NodeState *NodeState `json:"nodeState"` // 节点状态
+	Timestamp time.Time  `json:"timestamp"` // 事件时间戳
 }
 
-// StateChangeObserver defines the interface for observing state changes
+// StateChangeObserver 定义状态变更观察者接口
+// 实现该接口可以监听 DAG 状态变化
 type StateChangeObserver interface {
+	// OnDAGStateChanged 当 DAG 状态变化时调用
 	OnDAGStateChanged(event *DAGStateChangeEvent)
 }
 
+// ApplicationInfo 存储应用的信息和状态
+// 包括 DAG、节点状态、观察者列表等
 type ApplicationInfo struct {
-	ID         string
-	dag        *controller.DAG
-	nodeStates map[string]*NodeState
-	observers  []StateChangeObserver
-	mutex      sync.RWMutex
+	ID         string                // 应用 ID
+	dag        *controller.DAG       // 应用的 DAG
+	nodeStates map[string]*NodeState // 节点状态映射表
+	observers  []StateChangeObserver // 状态变更观察者列表
+	mutex      sync.RWMutex          // 保护并发访问的读写锁
 }
 
-// NewApplicationInfo creates a new ApplicationInfo instance
+// NewApplicationInfo 创建一个新的应用信息实例
+// 参数:
+//   - appID: 应用标识符
+//
+// 返回值:
+//   - *ApplicationInfo: 应用信息实例
 func NewApplicationInfo(appID string) *ApplicationInfo {
 	return &ApplicationInfo{
 		ID:         appID,
@@ -180,7 +283,15 @@ func NewApplicationInfo(appID string) *ApplicationInfo {
 	}
 }
 
-// SetDAG sets the DAG of the current application.
+// SetDAG 设置应用的 DAG 并初始化节点状态
+// 参数:
+//   - dag: DAG 对象
+//
+// 该方法会：
+//  1. 保存 DAG 引用
+//  2. 从 DAG 中提取所有节点
+//  3. 为每个节点创建初始状态
+//  4. 区分控制节点和数据节点进行不同的初始化
 func (a *ApplicationInfo) SetDAG(dag *controller.DAG) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
@@ -219,14 +330,26 @@ func (a *ApplicationInfo) SetDAG(dag *controller.DAG) {
 	}
 }
 
-// GetDAG returns the DAG of the current application.
+// GetDAG 获取应用的 DAG
+// 返回值:
+//   - *controller.DAG: DAG 对象
+//
+// 该方法是线程安全的
 func (a *ApplicationInfo) GetDAG() *controller.DAG {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 	return a.dag
 }
 
-// MarkNodeDone marks a node as done and notifies observers
+// MarkNodeDone 标记节点为已完成并通知观察者
+// 参数:
+//   - nodeID: 节点 ID
+//
+// 执行操作:
+//  1. 更新节点状态为 Done
+//  2. 同步更新 DAG 中的节点状态
+//  3. 生成状态变更事件
+//  4. 异步通知所有观察者
 func (a *ApplicationInfo) MarkNodeDone(nodeID string) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
@@ -260,12 +383,16 @@ func (a *ApplicationInfo) MarkNodeDone(nodeID string) {
 	}
 }
 
-// GetNodeStates returns all node states
+// GetNodeStates 获取所有节点的状态
+// 返回值:
+//   - map[string]*NodeState: 节点状态映射表的副本
+//
+// 该方法返回副本以避免并发访问问题，是线程安全的
 func (a *ApplicationInfo) GetNodeStates() map[string]*NodeState {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	// Return a copy to avoid race conditions
+	// 返回副本以避免竞态条件
 	states := make(map[string]*NodeState)
 	for k, v := range a.nodeStates {
 		stateCopy := *v
@@ -274,14 +401,20 @@ func (a *ApplicationInfo) GetNodeStates() map[string]*NodeState {
 	return states
 }
 
-// AddObserver adds a state change observer
+// AddObserver 添加状态变更观察者
+// 参数:
+//   - observer: 观察者实例
+//
+// 观察者会在节点状态变化时收到通知
 func (a *ApplicationInfo) AddObserver(observer StateChangeObserver) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	a.observers = append(a.observers, observer)
 }
 
-// RemoveObserver removes a state change observer
+// RemoveObserver 移除状态变更观察者
+// 参数:
+//   - observer: 要移除的观察者实例
 func (a *ApplicationInfo) RemoveObserver(observer StateChangeObserver) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()

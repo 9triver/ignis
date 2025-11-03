@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote/ipc"
-	"github.com/9triver/ignis/actor/remote/rpc"
-	"github.com/9triver/ignis/actor/remote/stub"
+	"github.com/9triver/ignis/transport/ipc"
+	"github.com/9triver/ignis/transport/rpc"
+	"github.com/9triver/ignis/transport/stub"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/platform/control"
@@ -21,7 +21,7 @@ func TestController(t *testing.T) {
 	cm := rpc.NewManager("127.0.0.1:8082")
 	em := ipc.NewManager("ipc://" + path.Join(configs.StoragePath, "test-ipc"))
 	sys := actor.NewActorSystem()
-	remoter := remote.NewRemote(sys, remote.Configure("127.0.0.1", 3001))
+	remoter := transport.NewRemote(sys, transport.Configure("127.0.0.1", 3001))
 	remoter.Start()
 	storeRef := store.Spawn(sys.Root, stub.NewActorStub(sys), "store")
 

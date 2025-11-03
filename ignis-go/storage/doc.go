@@ -49,7 +49,7 @@
 // Streaming operations:
 //
 //	// Upload from ignis Stream
-//	stream := objects.NewStream(dataChannel, objects.LangGo)
+//	stream := object.NewStream(dataChannel, object.LangGo)
 //	streamStorage.(storage.StreamStorage).PutIgnisStream(ctx, &storage.PutIgnisStreamRequest{
 //	    Bucket: "my-bucket",
 //	    Key: "large-file.bin",

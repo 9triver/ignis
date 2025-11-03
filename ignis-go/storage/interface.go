@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 )
 
 // ObjectStorage defines the core interface for object storage operations.
@@ -51,7 +51,7 @@ type StreamStorage interface {
 
 	// GetIgnisStream downloads an object and returns an ignis Stream
 	// Useful for passing data between actors
-	GetIgnisStream(ctx context.Context, req *GetObjectRequest) (objects.Interface, error)
+	GetIgnisStream(ctx context.Context, req *GetObjectRequest) (object.Interface, error)
 }
 
 // BucketManager defines operations for managing storage buckets.

@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 )
 
 // PutObjectRequest represents a request to upload an object.
@@ -54,7 +54,7 @@ type DeleteObjectRequest struct {
 	VersionID string // Optional: specific version to delete
 }
 
-// ListObjectsRequest represents a request to list objects.
+// ListObjectsRequest represents a request to list object.
 type ListObjectsRequest struct {
 	Bucket            string // Bucket name
 	Prefix            string // Filter objects by prefix
@@ -64,7 +64,7 @@ type ListObjectsRequest struct {
 	ContinuationToken string // Token for pagination
 }
 
-// ListObjectsResponse represents the response from listing objects.
+// ListObjectsResponse represents the response from listing object.
 type ListObjectsResponse struct {
 	Bucket                string       // Bucket name
 	Prefix                string       // Prefix used for filtering
@@ -130,7 +130,7 @@ type PutStreamRequest struct {
 type PutIgnisStreamRequest struct {
 	Bucket      string            // Bucket name
 	Key         string            // Object key
-	Stream      objects.Interface // ignis Stream object
+	Stream      object.Interface // ignis Stream object
 	ContentType string            // MIME type
 	Metadata    map[string]string // Custom metadata
 	ChunkSize   int               // Size of each chunk (default: 5MB)
