@@ -35,7 +35,7 @@ class ServiceStub(object):
             channel: A grpc.Channel.
         """
         self.Session = channel.stream_stream(
-                '/proto.Service/Session',
+                '/cluster.Service/Session',
                 request_serializer=cluster_dot_cluster__pb2.Message.SerializeToString,
                 response_deserializer=cluster_dot_cluster__pb2.Message.FromString,
                 _registered_method=True)
@@ -60,9 +60,9 @@ def add_ServiceServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'proto.Service', rpc_method_handlers)
+            'cluster.Service', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('proto.Service', rpc_method_handlers)
+    server.add_registered_method_handlers('cluster.Service', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -83,7 +83,7 @@ class Service(object):
         return grpc.experimental.stream_stream(
             request_iterator,
             target,
-            '/proto.Service/Session',
+            '/cluster.Service/Session',
             cluster_dot_cluster__pb2.Message.SerializeToString,
             cluster_dot_cluster__pb2.Message.FromString,
             options,

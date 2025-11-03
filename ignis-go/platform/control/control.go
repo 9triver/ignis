@@ -3,6 +3,7 @@ package control
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
@@ -11,6 +12,7 @@ import (
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -220,6 +222,37 @@ func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.M
 	c.appInfo.MarkNodeDone(markDone.NodeId)
 }
 
+func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controller.RequestObject) {
+	ctx.Logger().Info("control: request object",
+		"id", requestObject.ID,
+	)
+	store.GetObject(ctx, c.store.PID, &proto.Flow{
+		ID: requestObject.ID,
+		Source: &proto.StoreRef{
+			ID:  c.store.ID,
+			PID: c.store.PID,
+		},
+	}).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
+		if err != nil {
+			ctx.Logger().Error("control: request object error",
+				"id", requestObject.ID,
+				"err", err,
+			)
+			return
+		}
+
+		encoded, err := obj.Encode()
+		if err != nil {
+			ctx.Logger().Error("control: encode object error",
+				"id", requestObject.ID,
+				"err", err,
+			)
+		}
+		msg := controller.NewResponseObject(requestObject.ID, encoded, err)
+		c.controller.SendChan() <- msg
+	})
+}
+
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
 	switch cmd := msg.Command.(type) {
 	case *controller.Message_AppendPyFunc:
@@ -234,6 +267,8 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 		c.onDAG(ctx, cmd.DAG)
 	case *controller.Message_MarkDAGNodeDone:
 		c.onMarkDAGNodeDone(ctx, cmd.MarkDAGNodeDone)
+	case *controller.Message_RequestObject:
+		c.onRequestObject(ctx, cmd.RequestObject)
 	}
 }
 

@@ -19,6 +19,8 @@ enum CommandType {
   FR_REGISTER_REQUEST = 11; // backend: register application
   FR_DAG = 12; // frontend: send DAG structure
   FR_MARK_DAG_NODE_DONE = 13; // frontend: notify DAG node done
+  FR_REQUEST_OBJECT=14; // frontend: request object from object store
+  BK_RESPONSE_OBJECT=15; // backend: response object to request object
 }
 
 message Ack {
@@ -82,8 +84,8 @@ message AppendPyClass {
   repeated string Requirements = 4; // function dependencies
   bytes PickledObject = 5; // encoded function impl
   proto.Language Language = 6; // return type of function
-  // TODO: Resources
-  int32 Replicas = 7;
+  Resources Resources = 7; // resources required by class
+  int32 Replicas = 8;
 }
 
 message AppendArg {
@@ -162,6 +164,17 @@ message MarkDAGNodeDone {
   string SessionId = 2;
 }
 
+message RequestObject {
+  string ID = 1;
+  string Target = 2;
+}
+
+message ResponseObject {
+  string ID = 1;
+  proto.EncodedObject Value = 2;
+  string Error = 3;
+}
+
 message Message {
   CommandType Type = 1;
   oneof Command {
@@ -178,6 +191,8 @@ message Message {
     RegisterRequest RegisterRequest = 12;
     DAG DAG = 13;
     MarkDAGNodeDone MarkDAGNodeDone = 14;
+    RequestObject RequestObject = 15;
+    ResponseObject ResponseObject = 16;
   }
 }
 

@@ -283,7 +283,7 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 			}
 
 			fut.Resolve(msg.Value)
-			// TODO need exit?
+			c.Stop(c.Self()) // exit actor
 		}
 	})
 

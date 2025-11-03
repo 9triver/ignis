@@ -6,6 +6,17 @@ import (
 	"github.com/9triver/ignis/proto"
 )
 
+func NewResponseObject(id string, obj *proto.EncodedObject, err error) *Message {
+	cmd := &ResponseObject{
+		ID:    id,
+		Value: obj,
+	}
+	if err != nil {
+		cmd.Error = err.Error()
+	}
+	return NewMessage(cmd)
+}
+
 func NewAck(err error) *Message {
 	ack := &Ack{}
 	if err != nil {
@@ -114,6 +125,9 @@ func NewMessage(cmd pb.Message) *Message {
 	case *ReturnResult:
 		ret.Type = CommandType_BK_RETURN_RESULT
 		ret.Command = &Message_ReturnResult{ReturnResult: cmd}
+	case *ResponseObject:
+		ret.Type = CommandType_BK_RESPONSE_OBJECT
+		ret.Command = &Message_ResponseObject{ResponseObject: cmd}
 	default:
 		ret.Type = CommandType_UNSPECIFIED
 	}

@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Service_Session_FullMethodName = "/proto.Service/Session"
+	Service_Session_FullMethodName = "/cluster.Service/Session"
 )
 
 // ServiceClient is the client API for Service service.
@@ -100,7 +100,7 @@ type Service_SessionServer = grpc.BidiStreamingServer[Message, Message]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Service_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.Service",
+	ServiceName: "cluster.Service",
 	HandlerType: (*ServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
