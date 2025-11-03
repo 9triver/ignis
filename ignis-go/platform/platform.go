@@ -3,8 +3,6 @@ package platform
 import (
 	"context"
 	"path"
-	"sync"
-	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
@@ -14,6 +12,7 @@ import (
 	"github.com/9triver/ignis/actor/remote/ipc"
 	"github.com/9triver/ignis/actor/remote/rpc"
 	"github.com/9triver/ignis/configs"
+	"github.com/9triver/ignis/monitor"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
@@ -32,8 +31,8 @@ type Platform struct {
 	em remote.ExecutorManager
 	// Deployer
 	dp task.Deployer
-	// Application infos
-	appInfos map[string]*ApplicationInfo
+	// Monitor system
+	monitor monitor.Monitor
 	// Controller actor refs
 	controllerActorRefs map[string]*proto.ActorRef
 }
@@ -72,15 +71,29 @@ func (p *Platform) Run() error {
 					continue
 				}
 				appID := req.GetApplicationID()
-				if _, ok := p.appInfos[appID]; ok {
+
+				// 检查应用是否已注册
+				if info, _ := p.monitor.GetApplicationInfo(ctx, appID); info != nil {
 					logrus.Errorf("Application ID %s is conflicted", appID)
 					continue
 				}
-				appInfo := NewApplicationInfo(appID)
-				actorRef := control.SpawnTaskControllerV2(p.sys.Root, appID, p.dp, appInfo, ctrlr, func() {
-					// delete(p.appInfos, appID)
+
+				// 注册应用
+				if err := p.monitor.RegisterApplication(ctx, appID, &monitor.ApplicationMetadata{
+					AppID: appID,
+					Name:  appID,
+				}); err != nil {
+					logrus.Errorf("Failed to register application %s: %v", appID, err)
+					continue
+				}
+
+				actorRef := control.SpawnTaskControllerV2(p.sys.Root, appID, p.dp, p.monitor, ctx, ctrlr, func() {
+					// 应用关闭时注销
+					if err := p.monitor.UnregisterApplication(context.Background(), appID); err != nil {
+						logrus.Errorf("Failed to unregister application %s: %v", appID, err)
+					}
 				})
-				p.appInfos[appID] = appInfo
+
 				p.controllerActorRefs[appID] = actorRef
 				logrus.Infof("Application %s is registered", appID)
 
@@ -96,7 +109,14 @@ func (p *Platform) Run() error {
 	return ctx.Err()
 }
 
-func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platform {
+// NewPlatform 创建一个新的 Platform 实例
+// mon: 监控实例，如果为 nil 则使用默认的空操作监控
+func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer, mon monitor.Monitor) *Platform {
+	if mon == nil {
+		// 使用默认的空操作监控
+		mon = monitor.DefaultMonitor()
+	}
+
 	opt := utils.WithLogger()
 	ipcAddr := "ipc://" + path.Join(configs.StoragePath, "em-ipc")
 
@@ -118,177 +138,12 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 		cm:                  rpc.NewManager(rpcAddr),
 		em:                  em,
 		dp:                  dp,
-		appInfos:            make(map[string]*ApplicationInfo),
+		monitor:             mon,
 		controllerActorRefs: make(map[string]*proto.ActorRef),
 	}
 }
 
-// GetControllerActorRef returns the actor ref of the controller of the application.
-func (p *Platform) GetApplicationDAG(appID string) *controller.DAG {
-	logrus.Infof("GetApplicationDAG: %s", appID)
-	logrus.Infof("appInfos: %v", p.appInfos)
-	if _, ok := p.appInfos[appID]; !ok {
-		return nil
-	}
-	return p.appInfos[appID].GetDAG()
-}
-
-// GetApplicationInfo returns the ApplicationInfo for the given application ID
-func (p *Platform) GetApplicationInfo(appID string) *ApplicationInfo {
-	if appInfo, ok := p.appInfos[appID]; ok {
-		return appInfo
-	}
-	return nil
-}
-
-// NodeState represents the state of a DAG node
-type NodeState struct {
-	ID       string    `json:"id"`
-	Type     string    `json:"type"` // "control" or "data"
-	Done     bool      `json:"done"`
-	Ready    bool      `json:"ready"`
-	UpdateAt time.Time `json:"updateAt"`
-}
-
-// DAGStateChangeEvent represents a DAG state change event
-type DAGStateChangeEvent struct {
-	AppID     string     `json:"appId"`
-	NodeID    string     `json:"nodeId"`
-	NodeState *NodeState `json:"nodeState"`
-	Timestamp time.Time  `json:"timestamp"`
-}
-
-// StateChangeObserver defines the interface for observing state changes
-type StateChangeObserver interface {
-	OnDAGStateChanged(event *DAGStateChangeEvent)
-}
-
-type ApplicationInfo struct {
-	ID         string
-	dag        *controller.DAG
-	nodeStates map[string]*NodeState
-	observers  []StateChangeObserver
-	mutex      sync.RWMutex
-}
-
-// NewApplicationInfo creates a new ApplicationInfo instance
-func NewApplicationInfo(appID string) *ApplicationInfo {
-	return &ApplicationInfo{
-		ID:         appID,
-		nodeStates: make(map[string]*NodeState),
-		observers:  make([]StateChangeObserver, 0),
-	}
-}
-
-// SetDAG sets the DAG of the current application.
-func (a *ApplicationInfo) SetDAG(dag *controller.DAG) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	a.dag = dag
-
-	// Initialize node states from DAG
-	if a.nodeStates == nil {
-		a.nodeStates = make(map[string]*NodeState)
-	}
-
-	for _, node := range dag.Nodes {
-		var nodeState *NodeState
-		if node.Type == "ControlNode" && node.GetControlNode() != nil {
-			cn := node.GetControlNode()
-			nodeState = &NodeState{
-				ID:       cn.Id,
-				Type:     "control",
-				Done:     cn.Done,
-				Ready:    true, // Control nodes are ready by default
-				UpdateAt: time.Now(),
-			}
-		} else if node.Type == "DataNode" && node.GetDataNode() != nil {
-			dn := node.GetDataNode()
-			nodeState = &NodeState{
-				ID:       dn.Id,
-				Type:     "data",
-				Done:     dn.Done,
-				Ready:    dn.Ready,
-				UpdateAt: time.Now(),
-			}
-		}
-
-		if nodeState != nil {
-			a.nodeStates[nodeState.ID] = nodeState
-		}
-	}
-}
-
-// GetDAG returns the DAG of the current application.
-func (a *ApplicationInfo) GetDAG() *controller.DAG {
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
-	return a.dag
-}
-
-// MarkNodeDone marks a node as done and notifies observers
-func (a *ApplicationInfo) MarkNodeDone(nodeID string) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
-	if nodeState, exists := a.nodeStates[nodeID]; exists {
-		nodeState.Done = true
-		nodeState.UpdateAt = time.Now()
-
-		// Update the DAG node state as well
-		if a.dag != nil {
-			for _, node := range a.dag.Nodes {
-				if node.Type == "ControlNode" && node.GetControlNode() != nil && node.GetControlNode().Id == nodeID {
-					node.GetControlNode().Done = true
-				} else if node.Type == "DataNode" && node.GetDataNode() != nil && node.GetDataNode().Id == nodeID {
-					node.GetDataNode().Done = true
-				}
-			}
-		}
-
-		// Notify observers
-		event := &DAGStateChangeEvent{
-			AppID:     a.ID,
-			NodeID:    nodeID,
-			NodeState: nodeState,
-			Timestamp: time.Now(),
-		}
-
-		for _, observer := range a.observers {
-			go observer.OnDAGStateChanged(event)
-		}
-	}
-}
-
-// GetNodeStates returns all node states
-func (a *ApplicationInfo) GetNodeStates() map[string]*NodeState {
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
-
-	// Return a copy to avoid race conditions
-	states := make(map[string]*NodeState)
-	for k, v := range a.nodeStates {
-		stateCopy := *v
-		states[k] = &stateCopy
-	}
-	return states
-}
-
-// AddObserver adds a state change observer
-func (a *ApplicationInfo) AddObserver(observer StateChangeObserver) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	a.observers = append(a.observers, observer)
-}
-
-// RemoveObserver removes a state change observer
-func (a *ApplicationInfo) RemoveObserver(observer StateChangeObserver) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	for i, obs := range a.observers {
-		if obs == observer {
-			a.observers = append(a.observers[:i], a.observers[i+1:]...)
-			break
-		}
-	}
+// GetMonitor 返回 Platform 的监控实例
+func (p *Platform) GetMonitor() monitor.Monitor {
+	return p.monitor
 }

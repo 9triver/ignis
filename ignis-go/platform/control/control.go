@@ -1,6 +1,7 @@
 package control
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/9triver/ignis/actor/remote"
 	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
+	"github.com/9triver/ignis/monitor"
 	"github.com/9triver/ignis/objects"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
@@ -25,7 +27,8 @@ type Controller struct {
 	controller remote.Controller
 	store      *proto.StoreRef
 	appID      string
-	appInfo    ApplicationInfo
+	monitor    monitor.Monitor
+	ctx        context.Context
 
 	nodes    map[string]*task.Node
 	groups   map[string]*task.ActorGroup
@@ -210,7 +213,7 @@ func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
 	ctx.Logger().Info("control: append DAG",
 		"node num", len(dag.Nodes),
 	)
-	c.appInfo.SetDAG(dag)
+	_ = c.monitor.SetApplicationDAG(c.ctx, c.appID, dag)
 }
 
 func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.MarkDAGNodeDone) {
@@ -219,7 +222,9 @@ func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.M
 	)
 
 	// Update the application info with the node completion
-	c.appInfo.MarkNodeDone(markDone.NodeId)
+	_ = c.monitor.MarkNodeDone(c.ctx, c.appID, markDone.NodeId, &monitor.NodeResult{
+		Success: true,
+	})
 }
 
 func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controller.RequestObject) {
@@ -298,7 +303,7 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeResponse) {
 	}
 
 	// Automatically mark the corresponding ControlNode and its output DataNode as done when task execution completes
-	if c.appInfo != nil {
+	if c.monitor != nil {
 		// Find the node IDs by function name
 		controlNodeID, outputDataNodeID := c.findNodeIDsByFunctionName(name)
 		if controlNodeID != "" {
@@ -307,7 +312,9 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeResponse) {
 				"controlNodeID", controlNodeID,
 				"sessionId", sessionId,
 			)
-			c.appInfo.MarkNodeDone(controlNodeID)
+			_ = c.monitor.MarkNodeDone(c.ctx, c.appID, controlNodeID, &monitor.NodeResult{
+				Success: true,
+			})
 
 			// Also mark the output DataNode as done if it exists
 			if outputDataNodeID != "" {
@@ -316,7 +323,9 @@ func (c *Controller) onReturn(ctx actor.Context, ir *proto.InvokeResponse) {
 					"outputDataNodeID", outputDataNodeID,
 					"sessionId", sessionId,
 				)
-				c.appInfo.MarkNodeDone(outputDataNodeID)
+				_ = c.monitor.MarkNodeDone(c.ctx, c.appID, outputDataNodeID, &monitor.NodeResult{
+					Success: true,
+				})
 			}
 		} else {
 			ctx.Logger().Warn("control: could not find node ID for function",
@@ -373,15 +382,9 @@ func SpawnTaskController(
 	}
 }
 
-type ApplicationInfo interface {
-	GetDAG() *controller.DAG
-	SetDAG(dag *controller.DAG)
-	MarkNodeDone(nodeID string)
-}
-
 // For iarnet
 func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.Deployer,
-	appInfo ApplicationInfo, c remote.Controller, onClose func()) *proto.ActorRef {
+	mon monitor.Monitor, appCtx context.Context, c remote.Controller, onClose func()) *proto.ActorRef {
 
 	store := store.Spawn(ctx, nil, "store-"+appID)
 
@@ -391,7 +394,8 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 			id:         controllerId,
 			controller: c,
 			appID:      appID,
-			appInfo:    appInfo,
+			monitor:    mon,
+			ctx:        appCtx,
 			deployer:   deployer,
 			store:      store,
 			nodes:      make(map[string]*task.Node),
@@ -421,11 +425,11 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 
 // findNodeIDsByFunctionName finds the ControlNode ID and its output DataNode ID by function name
 func (c *Controller) findNodeIDsByFunctionName(functionName string) (controlNodeID, outputDataNodeID string) {
-	if c.appInfo == nil {
+	if c.monitor == nil {
 		return "", ""
 	}
 
-	dag := c.appInfo.GetDAG()
+	dag, _ := c.monitor.GetApplicationDAG(c.ctx, c.appID)
 	if dag == nil {
 		return "", ""
 	}
