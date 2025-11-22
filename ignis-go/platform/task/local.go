@@ -5,7 +5,7 @@ import (
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/store"
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
@@ -17,13 +17,17 @@ type LocalTaskHandler struct {
 	params    map[string]*proto.Flow
 }
 
-func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
-	futures := make(map[string]utils.Future[objects.Interface])
+func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.Ready() {
+		return errors.New("not ready")
+	}
+
+	futures := make(map[string]utils.Future[object.Interface])
 	for param, flow := range h.params {
 		futures[param] = store.GetObject(ctx, h.store, flow)
 	}
 
-	invoke := make(map[string]objects.Interface)
+	invoke := make(map[string]object.Interface)
 	for param, fut := range futures {
 		obj, err := fut.Result()
 		if err != nil {
@@ -59,7 +63,7 @@ func (h *LocalTaskHandler) Invoke(_ actor.Context, param string, value *proto.Fl
 	h.params[param] = value
 	h.deps.Remove(param)
 
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromFunction(sessionId string, store *actor.PID, f functions.Function) *LocalTaskHandler {
@@ -81,7 +85,11 @@ type ActorTaskHandler struct {
 	pid *actor.PID
 }
 
-func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo *proto.ActorRef) error {
+func (h *ActorTaskHandler) Start(ctx actor.Context, replyTo string) error {
+	if !h.Ready() {
+		return errors.New("not ready")
+	}
+
 	ctx.Send(h.pid, &proto.InvokeStart{
 		SessionID: h.sessionId,
 		ReplyTo:   replyTo,
@@ -96,7 +104,7 @@ func (h *ActorTaskHandler) Invoke(ctx actor.Context, param string, value *proto.
 		Value:     value,
 	})
 	h.deps.Remove(param)
-	return h.ready(), nil
+	return h.Ready(), nil
 }
 
 func HandlerFromPID(sessionId string, store *actor.PID, params []string, pid *actor.PID) *ActorTaskHandler {

@@ -11,8 +11,16 @@ enum CommandType {
   FR_APPEND_DATA = 3; // frontend: append data node
   FR_APPEND_ACTOR = 4; // front: append actor (for debugging purpose)
   FR_APPEND_PY_FUNC = 5; // frontend: append python function (control node definition)
-  FR_APPEND_ARG = 6; // frontend: append function arg to specified actor
-  BK_RETURN_RESULT = 7; // backend: send back execution result
+  FR_APPEND_PY_CLASS = 6; // frontend: append python class (control node definition)
+  FR_APPEND_ARG = 7; // frontend: append function arg to specified actor
+  FR_APPEND_CLASS_METHOD_ARG = 8; // frontend: append class method arg to specified actor
+  FR_INVOKE = 9;
+  BK_RETURN_RESULT = 10; // backend: send back execution result
+  FR_REGISTER_REQUEST = 11; // backend: register application
+  FR_DAG = 12; // frontend: send DAG structure
+  FR_MARK_DAG_NODE_DONE = 13; // frontend: notify DAG node done
+  FR_REQUEST_OBJECT=14; // frontend: request object from object store
+  BK_RESPONSE_OBJECT=15; // backend: response object to request object
 }
 
 message Ack {
@@ -47,6 +55,12 @@ message AppendActor {
   proto.ActorRef Ref = 3; // Ref to actor
 }
 
+message Resources {
+  int64 CPU = 1; // CPU cores
+  int64 Memory = 2; // memory in Bytes
+  int64 GPU = 3; // GPU cores
+}
+
 message AppendPyFunc {
   string Name = 1; // function name
   repeated string Params = 2; //function params
@@ -54,8 +68,24 @@ message AppendPyFunc {
   repeated string Requirements = 4; // function dependencies
   bytes PickledObject = 5; // encoded function impl
   proto.Language Language = 6; // return type of function
-  // TODO: Resources
-  int32 Replicas = 7;
+  Resources Resources = 7; // resources required by function
+  int32 Replicas = 8; // number of replicas
+}
+
+message AppendPyClass {
+  message ClassMethod {
+    string Name = 1;
+    repeated string Params = 2;
+  }
+
+  string Name = 1; // class name
+  repeated ClassMethod Methods = 2;
+  string Venv = 3; // function virtual environment
+  repeated string Requirements = 4; // function dependencies
+  bytes PickledObject = 5; // encoded function impl
+  proto.Language Language = 6; // return type of function
+  Resources Resources = 7; // resources required by class
+  int32 Replicas = 8;
 }
 
 message AppendArg {
@@ -64,6 +94,20 @@ message AppendArg {
   string Name = 3; // function name
   string Param = 4; // param name
   Data Value = 5; // object ref for param
+}
+
+message AppendClassMethodArg {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of **class** instance under current execution session
+  string MethodName = 3; // method name
+  string Param = 4; // param name
+  Data Value = 5; // object ref for param
+}
+
+message Invoke {
+  string SessionID = 1; // current execution session
+  string InstanceID = 2; // id of function instance under current execution session
+  string Name = 3; // function name
 }
 
 message ReturnResult {
@@ -76,6 +120,61 @@ message ReturnResult {
   }
 }
 
+message RegisterRequest {
+  string ApplicationID = 1;
+}
+
+// DAG Node Messages
+message ControlNode {
+  string Id = 1;
+  bool Done = 2;
+  string FunctionName = 3;
+  map<string, string> Params = 4; // lambda_id -> parameter_name mapping
+  int32 Current = 5;
+  string DataNode = 6; // id of the output data node
+  repeated string PreDataNodes = 7; // ids of input data nodes
+  string FunctionType = 8; // "remote" or "local"
+}
+
+message DataNode {
+  string Id = 1;
+  bool Done = 2;
+  string Lambda = 3; // lambda id
+  bool Ready = 4;
+  repeated string SufControlNodes = 5; // ids of successor control nodes
+  optional string PreControlNode = 6; // id of predecessor control node (nullable)
+  optional string ParentNode = 7; // id of parent data node (nullable)
+  repeated string ChildNode = 8; // ids of child data nodes
+}
+
+message DAGNode {
+  string Type = 1; // "ControlNode" or "DataNode"
+  oneof Node {
+    ControlNode ControlNode = 2;
+    DataNode DataNode = 3;
+  }
+}
+
+message DAG {
+  repeated DAGNode Nodes = 1;
+}
+
+message MarkDAGNodeDone {
+  string NodeId = 1;
+  string SessionId = 2;
+}
+
+message RequestObject {
+  string ID = 1;
+  string Target = 2;
+}
+
+message ResponseObject {
+  string ID = 1;
+  proto.EncodedObject Value = 2;
+  string Error = 3;
+}
+
 message Message {
   CommandType Type = 1;
   oneof Command {
@@ -84,8 +183,16 @@ message Message {
     AppendData AppendData = 4;
     AppendActor AppendActor = 5;
     AppendPyFunc AppendPyFunc = 6;
-    AppendArg AppendArg = 7;
-    ReturnResult ReturnResult = 8;
+    AppendPyClass AppendPyClass = 7;
+    AppendArg AppendArg = 8;
+    AppendClassMethodArg AppendClassMethodArg = 9;
+    Invoke Invoke = 10;
+    ReturnResult ReturnResult = 11;
+    RegisterRequest RegisterRequest = 12;
+    DAG DAG = 13;
+    MarkDAGNodeDone MarkDAGNodeDone = 14;
+    RequestObject RequestObject = 15;
+    ResponseObject ResponseObject = 16;
   }
 }
 

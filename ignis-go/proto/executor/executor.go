@@ -63,12 +63,12 @@ func NewReturn(conn, corrId string, value *proto.EncodedObject, err error) *Mess
 }
 
 func NewStreamChunk(conn, streamId string, value *proto.EncodedObject, err error) *Message {
-	cmd := proto.NewStreamChunk(streamId, value, err)
+	cmd := proto.NewStreamChunk(streamId, "", value, err)
 	return NewMessage(conn, cmd)
 }
 
 func NewStreamEnd(conn, streamId string) *Message {
-	cmd := proto.NewStreamEnd(streamId)
+	cmd := proto.NewStreamEnd(streamId, "") // TODO: refactor this
 	return NewMessage(conn, cmd)
 }
 

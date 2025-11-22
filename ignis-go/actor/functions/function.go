@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 )
 
@@ -13,14 +13,15 @@ import (
 type Function interface {
 	Name() string
 	Params() []string
-	Call(params map[string]objects.Interface) (objects.Interface, error)
-	TimedCall(params map[string]objects.Interface) (time.Duration, objects.Interface, error)
+	Call(params map[string]object.Interface) (object.Interface, error)
+	TimedCall(params map[string]object.Interface) (time.Duration, object.Interface, error)
 	Language() proto.Language
 }
 
 var (
 	_ Function = (*GoFunction[any, any])(nil)
 	_ Function = (*PyFunction)(nil)
+	_ Function = (*RemoteFunction)(nil)
 )
 
 type FuncDec struct {

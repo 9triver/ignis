@@ -6,7 +6,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 
 	"github.com/9triver/ignis/actor/store"
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/utils"
 )
@@ -15,7 +15,7 @@ type Session struct {
 	id       string
 	store    *actor.PID
 	executor *Executor
-	params   map[string]objects.Interface
+	params   map[string]object.Interface
 	start    *SessionStart
 	deps     utils.Set[string]
 	link     time.Duration
@@ -24,12 +24,12 @@ type Session struct {
 type SessionInvoke struct {
 	Param string
 	Link  time.Duration
-	Value objects.Interface
+	Value object.Interface
 }
 
 type SessionStart struct {
 	Info    *proto.ActorInfo
-	ReplyTo *proto.ActorRef
+	ReplyTo string
 }
 
 func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
@@ -43,7 +43,7 @@ func (s *Session) onInvoke(ctx actor.Context, invoke *SessionInvoke) {
 }
 
 func (s *Session) onStart(ctx actor.Context, start *SessionStart) {
-	ctx.Logger().Info("session: start execution", "session", s.id, "replyTo", start.ReplyTo.ID)
+	ctx.Logger().Info("session: start execution", "session", s.id, "replyTo", start.ReplyTo)
 	s.start = start
 	if s.deps.Empty() {
 		s.doInvoke(ctx)
@@ -61,7 +61,7 @@ func (s *Session) onError(ctx actor.Context, err error) {
 	})
 }
 
-func (s *Session) onComplete(ctx actor.Context, obj objects.Interface, duration time.Duration) {
+func (s *Session) onComplete(ctx actor.Context, obj object.Interface, duration time.Duration) {
 	ctx.Logger().Info("session: execution complete", "session", s.id, "duration", duration)
 
 	info := s.start.Info
@@ -85,12 +85,13 @@ func (s *Session) onComplete(ctx actor.Context, obj objects.Interface, duration 
 }
 
 func (s *Session) doInvoke(ctx actor.Context) {
+	ctx.Logger().Info("session: invoke execution", "session", s.id, "params", s.params)
 	exec := &ExecInput{
 		Context:   ctx,
 		SessionID: s.id,
 		Params:    s.params,
 		Timed:     s.start.Info != nil,
-		OnDone: func(obj objects.Interface, err error, duration time.Duration) {
+		OnDone: func(obj object.Interface, err error, duration time.Duration) {
 			if err != nil {
 				s.onError(ctx, err)
 				return
@@ -122,7 +123,7 @@ func NewSession(
 			id:       id,
 			store:    store,
 			executor: executor,
-			params:   make(map[string]objects.Interface),
+			params:   make(map[string]object.Interface),
 			deps:     utils.MakeSetFromSlice(executor.Deps()),
 		}
 	})
