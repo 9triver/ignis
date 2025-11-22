@@ -21,6 +21,7 @@ type Function interface {
 var (
 	_ Function = (*GoFunction[any, any])(nil)
 	_ Function = (*PyFunction)(nil)
+	_ Function = (*RemoteFunction)(nil)
 )
 
 type FuncDec struct {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
+	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -34,10 +35,10 @@ type Config struct {
 
 // VenvMgrDeployer 是一个部署器，用于部署 Python 函数到 Venv 环境（原始默认实现）
 type VenvMgrDeployer struct {
-	vm *functions.VenvManager
+	vm *python.VenvManager
 }
 
-func NewVenvMgrDeployer(vm *functions.VenvManager) *VenvMgrDeployer {
+func NewVenvMgrDeployer(vm *python.VenvManager) *VenvMgrDeployer {
 	return &VenvMgrDeployer{
 		vm: vm,
 	}

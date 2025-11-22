@@ -11,7 +11,7 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
 
-	"github.com/9triver/ignis/actor/functions"
+	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/platform/task"
@@ -184,7 +184,7 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 	em := ipc.NewManager(ipcAddr)
 
 	if dp == nil {
-		vm, err := functions.NewVenvManager(ctx, em)
+		vm, err := python.NewVenvManager(ctx, em)
 		if err != nil {
 			panic(err)
 		}

@@ -3,6 +3,7 @@ package functions
 import (
 	"testing"
 
+	"github.com/9triver/ignis/actor/functions/remote"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -95,4 +96,19 @@ func TestStreamStreamFunc(t *testing.T) {
 
 	v, _ := r2.Value()
 	t.Log(v)
+}
+
+func TestRemote(t *testing.T) {
+	manager := remote.NewManager("0.0.0.0", 8085)
+	f := NewRemote(manager, "add", []string{"a", "b"}, "unikernel")
+	obj, err := f.Call(map[string]object.Interface{
+		"a": object.NewLocal(10, object.LangJson),
+		"b": object.NewLocal(20, object.LangJson),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(obj)
 }

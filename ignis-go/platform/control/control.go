@@ -8,20 +8,20 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
 
-	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/transport"
+	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
+	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/utils/errors"
 )
 
 type Controller struct {
 	id         string
-	manager    *functions.VenvManager
+	manager    *python.VenvManager
 	controller transport.Controller
 	store      *proto.StoreRef
 	appID      string
@@ -342,7 +342,7 @@ func (c *Controller) Receive(ctx actor.Context) {
 func SpawnTaskController(
 	ctx *actor.RootContext,
 	store *proto.StoreRef,
-	venvs *functions.VenvManager,
+	venvs *python.VenvManager,
 	cm transport.ControllerManager,
 	onClose func(),
 ) *proto.ActorRef {

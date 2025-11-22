@@ -1,6 +1,6 @@
 // Package functions 提供了函数调用的封装和适配功能
 // 该文件实现了 Python 虚拟环境管理器，用于管理多个独立的 Python 虚拟环境
-package functions
+package python
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/transport/ipc"
-	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -64,11 +64,11 @@ func getVenvPath() (string, error) {
 //   - 管理虚拟环境的远程执行器
 //   - 线程安全的虚拟环境访问
 type VenvManager struct {
-	mu      sync.Mutex             // 互斥锁，保护并发访问
-	ctx     context.Context        // 上下文，用于生命周期管理
-	cancel  context.CancelFunc     // 取消函数，用于关闭管理器
+	mu      sync.Mutex                // 互斥锁，保护并发访问
+	ctx     context.Context           // 上下文，用于生命周期管理
+	cancel  context.CancelFunc        // 取消函数，用于关闭管理器
 	em      transport.ExecutorManager // 远程执行器管理器
-	started map[string]bool        // 记录已启动的虚拟环境
+	started map[string]bool           // 记录已启动的虚拟环境
 
 	SystemExec string                 `json:"system_py"` // 系统 Python 可执行文件路径
 	Envs       map[string]*VirtualEnv `json:"envs"`      // 虚拟环境映射表，key 为环境名

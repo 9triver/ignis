@@ -1,6 +1,6 @@
 // Package functions 提供了函数调用的封装和适配功能
 // 该文件实现了 Python 虚拟环境的运行时管理，包括进程启动、通信和执行控制
-package functions
+package python
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
+	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -28,10 +28,10 @@ import (
 //   - 支持流式数据传输（Stream）
 //   - 每个执行请求通过唯一的 corrId（correlation ID）关联请求和响应
 type VirtualEnv struct {
-	mu      sync.Mutex                                 // 互斥锁，保护并发访问
-	ctx     context.Context                            // 上下文，用于生命周期管理
-	handler transport.Executor                            // 远程执行器，负责与 Python 进程通信
-	started bool                                       // 标记虚拟环境是否已启动
+	mu      sync.Mutex                                // 互斥锁，保护并发访问
+	ctx     context.Context                           // 上下文，用于生命周期管理
+	handler transport.Executor                        // 远程执行器，负责与 Python 进程通信
+	started bool                                      // 标记虚拟环境是否已启动
 	futures map[string]utils.Future[object.Interface] // Future 映射表，key 为 corrId
 	streams map[string]*object.Stream                 // Stream 映射表，key 为 corrId
 

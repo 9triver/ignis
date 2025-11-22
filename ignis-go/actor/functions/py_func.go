@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/executor"
@@ -22,8 +23,8 @@ import (
 //   - 自动处理参数的序列化和反序列化
 type PyFunction struct {
 	FuncDec
-	venv     *VirtualEnv    // Python 虚拟环境引用
-	language proto.Language // 函数所属的语言类型
+	venv     *python.VirtualEnv // Python 虚拟环境引用
+	language proto.Language     // 函数所属的语言类型
 }
 
 // NewPy 创建一个新的 Python 函数包装器实例
@@ -42,7 +43,7 @@ type PyFunction struct {
 //
 // 该函数会自动生成函数声明并调用 ImplPy 完成实际创建
 func NewPy(
-	manager *VenvManager,
+	manager *python.VenvManager,
 	name string,
 	params []string,
 	venv string,
@@ -72,7 +73,7 @@ func NewPy(
 //  2. 创建 AddHandler 请求，将序列化的 Python 函数对象发送到虚拟环境
 //  3. 返回封装好的 PyFunction 实例
 func ImplPy(
-	manager *VenvManager,
+	manager *python.VenvManager,
 	dec FuncDec,
 	venv string,
 	packages []string,
