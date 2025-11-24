@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/router"
@@ -74,4 +75,5 @@ func main() {
 	defer ctx.Stop(pid)
 
 	<-wait
+	time.Sleep(1 * time.Hour)
 }
