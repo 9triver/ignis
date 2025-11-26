@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/9triver/ignis/actor/remote/natrpc/pkg/common"
-	eh "github.com/9triver/ignis/actor/remote/natrpc/pkg/utils/errorhandler"
-	sm "github.com/9triver/ignis/actor/remote/natrpc/pkg/utils/safemap"
+	"github.com/9triver/ignis/transport/natrpc/pkg/common"
+	eh "github.com/9triver/ignis/transport/natrpc/pkg/utils/errorhandler"
+	sm "github.com/9triver/ignis/transport/natrpc/pkg/utils/safemap"
 	"github.com/gorilla/websocket"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v3"
