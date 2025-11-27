@@ -11,7 +11,6 @@ import (
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/cluster"
-	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/errors"
 )
@@ -27,7 +26,7 @@ import (
 type Actor struct {
 	id            string                                    // Store 标识符
 	ref           *proto.StoreRef                           // Store 引用（包含 ID 和 PID）
-	stub          transport.Stub                            // 传输存根（用于远程通信）
+	router        router.Router                             // 传输存根（用于远程通信）
 	localObjects  map[string]object.Interface               // 本地对象映射表
 	remoteObjects map[string]utils.Future[object.Interface] // 远程对象 Future 映射表
 }
@@ -66,16 +65,16 @@ func (s *Actor) onObjectRequest(ctx actor.Context, req *cluster.ObjectRequest) {
 	} else {
 		reply.Value = encoded
 	}
-	router.Send(ctx, req.ReplyTo, reply)
+	s.router.Send(req.ReplyTo, reply)
 
 	// if requested object is a stream, send all chunks
 	if stream, ok := obj.(*object.Stream); ok {
 		go func() {
-			defer router.Send(ctx, req.ReplyTo, proto.NewStreamEnd(req.ID, req.ReplyTo))
+			defer s.router.Send(req.ReplyTo, proto.NewStreamEnd(req.ID, req.ReplyTo))
 			for obj := range stream.ToChan() {
 				encoded, err := obj.Encode()
 				msg := proto.NewStreamChunk(req.ID, req.ReplyTo, encoded, err)
-				router.Send(ctx, req.ReplyTo, msg)
+				s.router.Send(req.ReplyTo, msg)
 			}
 		}()
 	}
@@ -215,7 +214,7 @@ func (s *Actor) requestRemoteObject(ctx actor.Context, flow *proto.Flow) utils.F
 
 	remoteRef := flow.Source
 
-	router.Send(ctx, remoteRef.ID, &cluster.ObjectRequest{
+	s.router.Send(remoteRef.ID, &cluster.ObjectRequest{
 		ID:      flow.ID,
 		Target:  flow.Source.ID,
 		ReplyTo: s.id,
@@ -272,7 +271,7 @@ func (s *Actor) onForward(ctx actor.Context, forward ForwardMessage) {
 		"target", forward.GetTarget(),
 		"msg", forward,
 	)
-	router.Send(ctx, forward.GetTarget(), forward)
+	s.router.Send(forward.GetTarget(), forward)
 }
 
 // Receive 实现 Actor 接口，处理接收到的消息
@@ -318,10 +317,10 @@ func (s *Actor) Receive(ctx actor.Context) {
 //   - *actor.Props: Actor 属性配置
 //
 // 该函数创建 Props 并在 Actor 初始化时设置 StoreRef
-func New(stub transport.Stub, id string) *actor.Props {
+func New(router router.Router, id string) *actor.Props {
 	s := &Actor{
 		id:            id,
-		stub:          stub,
+		router:        router,
 		localObjects:  make(map[string]object.Interface),
 		remoteObjects: make(map[string]utils.Future[object.Interface]),
 	}
@@ -346,10 +345,10 @@ func New(stub transport.Stub, id string) *actor.Props {
 //  2. 使用指定 ID 启动 Actor
 //  3. 在路由器中注册 Store
 //  4. 返回 Store 引用供其他组件使用
-func Spawn(ctx *actor.RootContext, stub transport.Stub, id string) *proto.StoreRef {
+func Spawn(ctx *actor.RootContext, router router.Router, id string) *proto.StoreRef {
 	s := &Actor{
 		id:            id,
-		stub:          stub,
+		router:        router,
 		localObjects:  make(map[string]object.Interface),
 		remoteObjects: make(map[string]utils.Future[object.Interface]),
 	}

@@ -110,5 +110,5 @@ func TestRemote(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Log(obj)
+	t.Log(obj, 111)
 }

@@ -3,7 +3,7 @@
 // remained: 断点续接可能存在短时间不应期（state 变为 disconnected前）
 // todo: waitGroup会不会比time.After好，在等待关闭的时候
 
-package sender
+package stun
 
 import (
 	"context"
@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/9triver/ignis/transport/natrpc/pkg/common"
-	eh "github.com/9triver/ignis/transport/natrpc/pkg/utils/errorhandler"
-	sm "github.com/9triver/ignis/transport/natrpc/pkg/utils/safemap"
+	"github.com/9triver/ignis/transport/stun/common"
+	eh "github.com/9triver/ignis/transport/stun/utils/errorhandler"
+	sm "github.com/9triver/ignis/transport/stun/utils/safemap"
 	"github.com/gorilla/websocket"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v3"

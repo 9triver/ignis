@@ -1,4 +1,4 @@
-package sender
+package stun
 
 // Sender interface
 type Sender interface {

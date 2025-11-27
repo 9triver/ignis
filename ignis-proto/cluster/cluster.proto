@@ -34,7 +34,7 @@ message ObjectResponse {
 }
 
 message Envelope {
-  proto.StoreRef Store = 1;
+  string Target = 1;
   MessageType Type = 2;
   oneof Message {
     ObjectRequest ObjectRequest = 3;
