@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
@@ -16,7 +17,8 @@ func TestLocal(t *testing.T) {
 	// 初始化Actor运行时
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
-	storeRef := store.Spawn(sys.Root, nil, "store")
+	r := router.NewActorRouter(ctx)
+	storeRef := store.Spawn(sys.Root, r, "store")
 
 	// 通过本地的Actor运行组件，向Store写入对象：obj-0, obj-1, ..., obj-9
 	wg := sync.WaitGroup{}
@@ -70,7 +72,8 @@ func TestLocalStream(t *testing.T) {
 	// 初始化Actor运行时
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
-	storeRef := store.Spawn(ctx, nil, "store-stream")
+	r := router.NewActorRouter(ctx)
+	storeRef := store.Spawn(ctx, r, "store-stream")
 
 	// 创建一个流对象，并将其保存到Store
 	streamID := "stream-0"

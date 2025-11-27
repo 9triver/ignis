@@ -3,7 +3,8 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -53,18 +54,18 @@ class ObjectResponse(_message.Message):
     def __init__(self, ID: _Optional[str] = ..., Target: _Optional[str] = ..., Value: _Optional[_Union[_platform_pb2.EncodedObject, _Mapping]] = ..., Error: _Optional[str] = ...) -> None: ...
 
 class Envelope(_message.Message):
-    __slots__ = ("Store", "Type", "ObjectRequest", "ObjectResponse", "StreamChunk")
-    STORE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("Target", "Type", "ObjectRequest", "ObjectResponse", "StreamChunk")
+    TARGET_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     OBJECTREQUEST_FIELD_NUMBER: _ClassVar[int]
     OBJECTRESPONSE_FIELD_NUMBER: _ClassVar[int]
     STREAMCHUNK_FIELD_NUMBER: _ClassVar[int]
-    Store: _platform_pb2.StoreRef
+    Target: str
     Type: MessageType
     ObjectRequest: ObjectRequest
     ObjectResponse: ObjectResponse
     StreamChunk: _platform_pb2.StreamChunk
-    def __init__(self, Store: _Optional[_Union[_platform_pb2.StoreRef, _Mapping]] = ..., Type: _Optional[_Union[MessageType, str]] = ..., ObjectRequest: _Optional[_Union[ObjectRequest, _Mapping]] = ..., ObjectResponse: _Optional[_Union[ObjectResponse, _Mapping]] = ..., StreamChunk: _Optional[_Union[_platform_pb2.StreamChunk, _Mapping]] = ...) -> None: ...
+    def __init__(self, Target: _Optional[str] = ..., Type: _Optional[_Union[MessageType, str]] = ..., ObjectRequest: _Optional[_Union[ObjectRequest, _Mapping]] = ..., ObjectResponse: _Optional[_Union[ObjectResponse, _Mapping]] = ..., StreamChunk: _Optional[_Union[_platform_pb2.StreamChunk, _Mapping]] = ...) -> None: ...
 
 class Ack(_message.Message):
     __slots__ = ("Error",)

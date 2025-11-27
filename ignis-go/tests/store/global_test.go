@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
-	"github.com/9triver/ignis/transport/stub"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
 )
@@ -17,6 +17,11 @@ import (
 func TestGlobal(t *testing.T) {
 	sys1 := actor.NewActorSystem()
 	sys2 := actor.NewActorSystem()
+	ctx1 := sys1.Root
+	ctx2 := sys2.Root
+
+	r1 := router.NewActorRouter(ctx1)
+	r2 := router.NewActorRouter(ctx2)
 
 	// 在:3000和:3001端口启动两个远程Actor系统，模拟多机部署
 	remoter1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
@@ -24,11 +29,11 @@ func TestGlobal(t *testing.T) {
 	remoter1.Start()
 	remoter2.Start()
 
-	storeRef1 := store.Spawn(sys1.Root, stub.NewActorStub(sys1), "store1")
-	storeRef2 := store.Spawn(sys2.Root, stub.NewActorStub(sys2), "store2")
+	storeRef1 := store.Spawn(ctx1, r1, "store1")
+	storeRef2 := store.Spawn(ctx2, r2, "store2")
 
-	ctx1 := sys1.Root
-	ctx2 := sys2.Root
+	r1.RegisterIfAbsent(storeRef2.ID, storeRef2.PID)
+	r2.RegisterIfAbsent(storeRef1.ID, storeRef1.PID)
 
 	wg := sync.WaitGroup{}
 	wg.Add(10)
@@ -77,17 +82,23 @@ func TestGlobal(t *testing.T) {
 func TestGlobalStream(t *testing.T) {
 	sys1 := actor.NewActorSystem()
 	sys2 := actor.NewActorSystem()
+	ctx1 := sys1.Root
+	ctx2 := sys2.Root
 
+	r1 := router.NewActorRouter(ctx1)
+	r2 := router.NewActorRouter(ctx2)
+
+	// 在:3000和:3001端口启动两个远程Actor系统，模拟多机部署
 	remoter1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
 	remoter2 := remote.NewRemote(sys2, remote.Configure("127.0.0.1", 3001))
 	remoter1.Start()
 	remoter2.Start()
 
-	storeRef1 := store.Spawn(sys1.Root, stub.NewActorStub(sys1), "store1")
-	storeRef2 := store.Spawn(sys2.Root, stub.NewActorStub(sys2), "store2")
+	storeRef1 := store.Spawn(ctx1, r1, "store1")
+	storeRef2 := store.Spawn(ctx2, r2, "store2")
 
-	ctx1 := sys1.Root
-	ctx2 := sys2.Root
+	r1.RegisterIfAbsent(storeRef2.ID, storeRef2.PID)
+	r2.RegisterIfAbsent(storeRef1.ID, storeRef1.PID)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

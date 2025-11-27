@@ -6,6 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
@@ -16,6 +17,7 @@ func TestZeroCopy(t *testing.T) {
 	// 初始化Actor运行时
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
+	r := router.NewActorRouter(ctx)
 	// 预先创建存储/传输的对象
 	var objects []object.Interface
 	// 存储对象的内存地址，用于验证零拷贝
@@ -27,7 +29,7 @@ func TestZeroCopy(t *testing.T) {
 		pointers = append(pointers, unsafe.Pointer(obj))
 	}
 
-	storeRef := store.Spawn(sys.Root, nil, "store")
+	storeRef := store.Spawn(sys.Root, r, "store")
 
 	// 通过本地的Actor运行组件，向Store写入对象：obj-0, obj-1, ..., obj-9
 	wg := sync.WaitGroup{}

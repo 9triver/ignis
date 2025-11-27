@@ -1,0 +1,5 @@
+services:
+  demo:
+    container_name: demo
+    image: ignis/demo:latest
+    restart: unless-stopped

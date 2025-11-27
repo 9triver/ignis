@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/router"
@@ -19,8 +20,11 @@ type DemoInput struct {
 
 type DemoOutput = int
 
-func Add(inputs DemoInput) (DemoOutput, error) {
-	return inputs.A + inputs.B, nil
+func Add(inputs DemoInput) (o DemoOutput, err error) {
+	fmt.Printf("Calling function `Add` with Input { A = %d, B = %d }\n", inputs.A, inputs.B)
+	o = inputs.A + inputs.B
+	fmt.Printf("Calling function `Add` with Output = %d\n", o)
+	return
 }
 
 func main() {
@@ -71,4 +75,5 @@ func main() {
 	defer ctx.Stop(pid)
 
 	<-wait
+	time.Sleep(1 * time.Hour)
 }
