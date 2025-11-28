@@ -6,7 +6,6 @@ import (
 	"github.com/9triver/ignis/actor/compute"
 	"github.com/9triver/ignis/actor/functions"
 	"github.com/9triver/ignis/actor/functions/python"
-	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
 	"github.com/asynkron/protoactor-go/actor"
@@ -66,7 +65,6 @@ func (d *VenvMgrDeployer) DeployPyFunc(ctx actor.Context, appId string, f *contr
 			CalcLatency: 0,
 			LinkLatency: 0,
 		}
-		router.Register(name, pid)
 		infos[i] = info
 		// group.Push(info)
 	}

@@ -17,7 +17,7 @@ func save() {
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
 
-	r := router.NewSTUNRouter(ctx, "s1", "ws://8.153.200.135:28080/ws", "s2")
+	r := router.NewSTUNRouter(ctx, "s1", "ws://8.153.200.135:28080/ws")
 	s := store.Spawn(ctx, r, "s1")
 
 	var wg sync.WaitGroup
@@ -45,7 +45,7 @@ func load() {
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
 
-	r := router.NewSTUNRouter(ctx, "s2", "ws://8.153.200.135:28080/ws", "s1")
+	r := router.NewSTUNRouter(ctx, "s2", "ws://8.153.200.135:28080/ws")
 	s := store.Spawn(sys.Root, r, "s2")
 
 	var wg sync.WaitGroup

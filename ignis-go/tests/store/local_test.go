@@ -17,7 +17,7 @@ func TestLocal(t *testing.T) {
 	// 初始化Actor运行时
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
-	r := router.NewActorRouter(ctx)
+	r := router.NewLocalRouter(ctx)
 	storeRef := store.Spawn(sys.Root, r, "store")
 
 	// 通过本地的Actor运行组件，向Store写入对象：obj-0, obj-1, ..., obj-9
@@ -72,7 +72,7 @@ func TestLocalStream(t *testing.T) {
 	// 初始化Actor运行时
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
-	r := router.NewActorRouter(ctx)
+	r := router.NewLocalRouter(ctx)
 	storeRef := store.Spawn(ctx, r, "store-stream")
 
 	// 创建一个流对象，并将其保存到Store

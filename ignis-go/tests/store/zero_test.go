@@ -17,7 +17,7 @@ func TestZeroCopy(t *testing.T) {
 	// 初始化Actor运行时
 	sys := actor.NewActorSystem()
 	ctx := sys.Root
-	r := router.NewActorRouter(ctx)
+	r := router.NewLocalRouter(ctx)
 	// 预先创建存储/传输的对象
 	var objects []object.Interface
 	// 存储对象的内存地址，用于验证零拷贝

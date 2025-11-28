@@ -1,29 +1,22 @@
 package router
 
-import (
-	"github.com/asynkron/protoactor-go/actor"
-)
-
-// ActorRouter 是消息路由器
+// LocalRouter 是消息路由器
 // 根据目标 ID 查找并路由消息到对应的 Actor PID
 //
 // 功能:
 //   - 维护 targetId 到 PID 的映射表
 //   - 支持设置默认目标（当找不到目标时使用）
 //   - 线程安全的路由操作
-type ActorRouter struct {
+type LocalRouter struct {
 	baseRouter
 }
 
-// NewActorRouter 创建一个新的路由器实例
+// NewLocalRouter 创建一个新的路由器实例
 // 返回值:
 //   - *Router: 路由器实例
-func NewActorRouter(ctx Context) *ActorRouter {
-	return &ActorRouter{
-		baseRouter: baseRouter{
-			ctx:        ctx,
-			routeTable: make(map[string]*actor.PID),
-		},
+func NewLocalRouter(ctx Context) *LocalRouter {
+	return &LocalRouter{
+		baseRouter: makeBaseRouter(ctx),
 	}
 }
 
@@ -37,19 +30,13 @@ func NewActorRouter(ctx Context) *ActorRouter {
 //   - 如果找到目标，发送到对应的 PID
 //   - 如果找不到目标且有默认目标，发送到默认目标
 //   - 如果都没有，记录错误日志
-func (r *ActorRouter) Send(targetId string, msg any) {
+func (r *LocalRouter) Send(targetId string, msg any) {
 	r.mu.RLock()
-	pid, ok := r.routeTable[targetId]
-	defaultPid := r.defaultTarget
-	r.mu.RUnlock()
+	defer r.mu.RUnlock()
 
+	pid, ok := r.routes[targetId]
 	if !ok {
-		if defaultPid == nil {
-			r.ctx.Logger().Error("target not found", "targetId", targetId)
-			return
-		}
-		r.ctx.Logger().Info("use default target", "targetId", targetId, "default target pid", defaultPid)
-		pid = defaultPid
+		return
 	}
 
 	r.ctx.Send(pid, msg)

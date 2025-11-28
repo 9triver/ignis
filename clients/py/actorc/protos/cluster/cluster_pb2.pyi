@@ -54,18 +54,20 @@ class ObjectResponse(_message.Message):
     def __init__(self, ID: _Optional[str] = ..., Target: _Optional[str] = ..., Value: _Optional[_Union[_platform_pb2.EncodedObject, _Mapping]] = ..., Error: _Optional[str] = ...) -> None: ...
 
 class Envelope(_message.Message):
-    __slots__ = ("Target", "Type", "ObjectRequest", "ObjectResponse", "StreamChunk")
+    __slots__ = ("Target", "Source", "Type", "ObjectRequest", "ObjectResponse", "StreamChunk")
     TARGET_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     OBJECTREQUEST_FIELD_NUMBER: _ClassVar[int]
     OBJECTRESPONSE_FIELD_NUMBER: _ClassVar[int]
     STREAMCHUNK_FIELD_NUMBER: _ClassVar[int]
     Target: str
+    Source: str
     Type: MessageType
     ObjectRequest: ObjectRequest
     ObjectResponse: ObjectResponse
     StreamChunk: _platform_pb2.StreamChunk
-    def __init__(self, Target: _Optional[str] = ..., Type: _Optional[_Union[MessageType, str]] = ..., ObjectRequest: _Optional[_Union[ObjectRequest, _Mapping]] = ..., ObjectResponse: _Optional[_Union[ObjectResponse, _Mapping]] = ..., StreamChunk: _Optional[_Union[_platform_pb2.StreamChunk, _Mapping]] = ...) -> None: ...
+    def __init__(self, Target: _Optional[str] = ..., Source: _Optional[str] = ..., Type: _Optional[_Union[MessageType, str]] = ..., ObjectRequest: _Optional[_Union[ObjectRequest, _Mapping]] = ..., ObjectResponse: _Optional[_Union[ObjectResponse, _Mapping]] = ..., StreamChunk: _Optional[_Union[_platform_pb2.StreamChunk, _Mapping]] = ...) -> None: ...
 
 class Ack(_message.Message):
     __slots__ = ("Error",)

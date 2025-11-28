@@ -5,7 +5,6 @@ import (
 
 	"github.com/9triver/ignis/proto/cluster"
 	"github.com/9triver/ignis/transport/stun"
-	"github.com/asynkron/protoactor-go/actor"
 	"github.com/pion/logging"
 	pb "google.golang.org/protobuf/proto"
 )
@@ -14,17 +13,20 @@ type STUNRouter struct {
 	baseRouter
 	sender stun.Sender
 	source string
-	peers  []string
 }
 
 func (r *STUNRouter) Send(targetId string, msg any) {
+	r.mu.RLock()
+	pid, ok := r.routes[targetId]
+	r.mu.RUnlock()
+
 	// find local
-	if pid, ok := r.routeTable[targetId]; ok {
+	if ok {
 		r.ctx.Send(pid, msg)
 		return
 	}
 
-	// if not found, broadcast to all remote peers
+	// if not found, broadcast to remote peer
 	pbMsg, ok := msg.(pb.Message)
 	if !ok {
 		r.ctx.Logger().Error(
@@ -35,7 +37,7 @@ func (r *STUNRouter) Send(targetId string, msg any) {
 		return
 	}
 
-	envelope := cluster.NewEnvelope(targetId, pbMsg)
+	envelope := cluster.NewEnvelope(r.source, targetId, pbMsg)
 	data, err := pb.Marshal(envelope)
 	if err != nil {
 		r.ctx.Logger().Error(
@@ -45,17 +47,27 @@ func (r *STUNRouter) Send(targetId string, msg any) {
 		)
 	}
 
-	for _, peer := range r.peers {
-		r.sender.Send(peer, data)
-	}
+	r.ctx.Logger().Info(
+		"router: forwarding message",
+		"target", targetId,
+	)
+	r.sender.Send(targetId, data)
 }
 
-func (r *STUNRouter) handleEnvelope(envelope *Envelope) {
+func (r *STUNRouter) handleEnvelope(envelope *cluster.Envelope) {
 	targetId := envelope.Target
-	pid, ok := r.routeTable[targetId]
+	pid, ok := r.routes[targetId]
 	if !ok {
 		return
 	}
+
+	// record source to route
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ctx.Logger().Info(
+		"router: receive message",
+		"target", targetId,
+	)
 
 	var send any
 	switch msg := envelope.Message.(type) {
@@ -66,30 +78,24 @@ func (r *STUNRouter) handleEnvelope(envelope *Envelope) {
 	case *cluster.Envelope_StreamChunk:
 		send = msg.StreamChunk
 	default:
+		r.ctx.Logger().Info(
+			"router: receive message",
+			"target", targetId,
+		)
 		return
 	}
 
 	r.ctx.Send(pid, send)
 }
 
-type Envelope = cluster.Envelope
-
-func NewSTUNRouter(
-	ctx Context,
-	source, signalingServer string,
-	peers ...string,
-) *STUNRouter {
+func NewSTUNRouter(ctx Context, source, signalingServer string) *STUNRouter {
 	router := &STUNRouter{
-		baseRouter: baseRouter{
-			ctx:        ctx,
-			routeTable: make(map[string]*actor.PID),
-		},
-		source: source,
-		peers:  peers,
+		baseRouter: makeBaseRouter(ctx),
+		source:     source,
 	}
 
 	onMessage := func(data []byte) {
-		envelope := &Envelope{}
+		envelope := &cluster.Envelope{}
 		if err := pb.Unmarshal(data, envelope); err != nil {
 			return
 		}

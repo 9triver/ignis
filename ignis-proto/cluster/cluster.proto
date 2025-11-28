@@ -35,11 +35,12 @@ message ObjectResponse {
 
 message Envelope {
   string Target = 1;
-  MessageType Type = 2;
+  string Source = 2;
+  MessageType Type = 3;
   oneof Message {
-    ObjectRequest ObjectRequest = 3;
-    ObjectResponse ObjectResponse = 4;
-    proto.StreamChunk StreamChunk = 5;
+    ObjectRequest ObjectRequest = 4;
+    ObjectResponse ObjectResponse = 5;
+    proto.StreamChunk StreamChunk = 6;
   }
 }
 

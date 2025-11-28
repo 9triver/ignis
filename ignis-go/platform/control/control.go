@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/9triver/ignis/actor/functions/python"
-	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/platform/task"
@@ -409,8 +408,6 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 			ctx.Send(pid, msg)
 		}
 	}()
-
-	router.Register(controllerId, pid)
 
 	return &proto.ActorRef{
 		// Store: store,

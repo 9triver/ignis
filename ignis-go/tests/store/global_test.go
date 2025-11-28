@@ -20,8 +20,8 @@ func TestGlobal(t *testing.T) {
 	ctx1 := sys1.Root
 	ctx2 := sys2.Root
 
-	r1 := router.NewActorRouter(ctx1)
-	r2 := router.NewActorRouter(ctx2)
+	r1 := router.NewLocalRouter(ctx1)
+	r2 := router.NewLocalRouter(ctx2)
 
 	// 在:3000和:3001端口启动两个远程Actor系统，模拟多机部署
 	remoter1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
@@ -32,8 +32,8 @@ func TestGlobal(t *testing.T) {
 	storeRef1 := store.Spawn(ctx1, r1, "store1")
 	storeRef2 := store.Spawn(ctx2, r2, "store2")
 
-	r1.RegisterIfAbsent(storeRef2.ID, storeRef2.PID)
-	r2.RegisterIfAbsent(storeRef1.ID, storeRef1.PID)
+	r1.Register(storeRef2.ID, storeRef2.PID)
+	r2.Register(storeRef1.ID, storeRef1.PID)
 
 	wg := sync.WaitGroup{}
 	wg.Add(10)
@@ -85,8 +85,8 @@ func TestGlobalStream(t *testing.T) {
 	ctx1 := sys1.Root
 	ctx2 := sys2.Root
 
-	r1 := router.NewActorRouter(ctx1)
-	r2 := router.NewActorRouter(ctx2)
+	r1 := router.NewLocalRouter(ctx1)
+	r2 := router.NewLocalRouter(ctx2)
 
 	// 在:3000和:3001端口启动两个远程Actor系统，模拟多机部署
 	remoter1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
@@ -97,8 +97,8 @@ func TestGlobalStream(t *testing.T) {
 	storeRef1 := store.Spawn(ctx1, r1, "store1")
 	storeRef2 := store.Spawn(ctx2, r2, "store2")
 
-	r1.RegisterIfAbsent(storeRef2.ID, storeRef2.PID)
-	r2.RegisterIfAbsent(storeRef1.ID, storeRef1.PID)
+	r1.Register(storeRef2.ID, storeRef2.PID)
+	r2.Register(storeRef1.ID, storeRef1.PID)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
