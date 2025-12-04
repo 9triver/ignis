@@ -226,7 +226,8 @@ func (x *ObjectResponse) GetError() string {
 type Envelope struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Target string                 `protobuf:"bytes,1,opt,name=Target,proto3" json:"Target,omitempty"`
-	Type   MessageType            `protobuf:"varint,2,opt,name=Type,proto3,enum=cluster.MessageType" json:"Type,omitempty"`
+	Source string                 `protobuf:"bytes,2,opt,name=Source,proto3" json:"Source,omitempty"`
+	Type   MessageType            `protobuf:"varint,3,opt,name=Type,proto3,enum=cluster.MessageType" json:"Type,omitempty"`
 	// Types that are valid to be assigned to Message:
 	//
 	//	*Envelope_ObjectRequest
@@ -270,6 +271,13 @@ func (*Envelope) Descriptor() ([]byte, []int) {
 func (x *Envelope) GetTarget() string {
 	if x != nil {
 		return x.Target
+	}
+	return ""
+}
+
+func (x *Envelope) GetSource() string {
+	if x != nil {
+		return x.Source
 	}
 	return ""
 }
@@ -320,15 +328,15 @@ type isEnvelope_Message interface {
 }
 
 type Envelope_ObjectRequest struct {
-	ObjectRequest *ObjectRequest `protobuf:"bytes,3,opt,name=ObjectRequest,proto3,oneof"`
+	ObjectRequest *ObjectRequest `protobuf:"bytes,4,opt,name=ObjectRequest,proto3,oneof"`
 }
 
 type Envelope_ObjectResponse struct {
-	ObjectResponse *ObjectResponse `protobuf:"bytes,4,opt,name=ObjectResponse,proto3,oneof"`
+	ObjectResponse *ObjectResponse `protobuf:"bytes,5,opt,name=ObjectResponse,proto3,oneof"`
 }
 
 type Envelope_StreamChunk struct {
-	StreamChunk *proto.StreamChunk `protobuf:"bytes,5,opt,name=StreamChunk,proto3,oneof"`
+	StreamChunk *proto.StreamChunk `protobuf:"bytes,6,opt,name=StreamChunk,proto3,oneof"`
 }
 
 func (*Envelope_ObjectRequest) isEnvelope_Message() {}
@@ -716,13 +724,14 @@ const file_cluster_cluster_proto_rawDesc = "" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x16\n" +
 	"\x06Target\x18\x02 \x01(\tR\x06Target\x12*\n" +
 	"\x05Value\x18\x03 \x01(\v2\x14.proto.EncodedObjectR\x05Value\x12\x14\n" +
-	"\x05Error\x18\x04 \x01(\tR\x05Error\"\x92\x02\n" +
+	"\x05Error\x18\x04 \x01(\tR\x05Error\"\xaa\x02\n" +
 	"\bEnvelope\x12\x16\n" +
-	"\x06Target\x18\x01 \x01(\tR\x06Target\x12(\n" +
-	"\x04Type\x18\x02 \x01(\x0e2\x14.cluster.MessageTypeR\x04Type\x12>\n" +
-	"\rObjectRequest\x18\x03 \x01(\v2\x16.cluster.ObjectRequestH\x00R\rObjectRequest\x12A\n" +
-	"\x0eObjectResponse\x18\x04 \x01(\v2\x17.cluster.ObjectResponseH\x00R\x0eObjectResponse\x126\n" +
-	"\vStreamChunk\x18\x05 \x01(\v2\x12.proto.StreamChunkH\x00R\vStreamChunkB\t\n" +
+	"\x06Target\x18\x01 \x01(\tR\x06Target\x12\x16\n" +
+	"\x06Source\x18\x02 \x01(\tR\x06Source\x12(\n" +
+	"\x04Type\x18\x03 \x01(\x0e2\x14.cluster.MessageTypeR\x04Type\x12>\n" +
+	"\rObjectRequest\x18\x04 \x01(\v2\x16.cluster.ObjectRequestH\x00R\rObjectRequest\x12A\n" +
+	"\x0eObjectResponse\x18\x05 \x01(\v2\x17.cluster.ObjectResponseH\x00R\x0eObjectResponse\x126\n" +
+	"\vStreamChunk\x18\x06 \x01(\v2\x12.proto.StreamChunkH\x00R\vStreamChunkB\t\n" +
 	"\aMessage\"\x1b\n" +
 	"\x03Ack\x12\x14\n" +
 	"\x05Error\x18\x01 \x01(\tR\x05Error\"\a\n" +

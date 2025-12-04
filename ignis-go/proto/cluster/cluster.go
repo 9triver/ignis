@@ -18,31 +18,32 @@ func NewFunction(name string, params []string, requirements []string, obj []byte
 	})
 }
 
-func NewObjectRequest(source string, id string, target, replyTo string) *Envelope {
+func NewObjectRequest(source, store string, id string, target, replyTo string) *Envelope {
 	msg := &ObjectRequest{
 		ID:      id,
 		Target:  target,
 		ReplyTo: replyTo,
 	}
-	return NewEnvelope(source, msg)
+	return NewEnvelope(source, store, msg)
 }
 
-func NewObjectResponse(source string, id string, value *proto.EncodedObject, err error) *Envelope {
+func NewObjectResponse(source, target string, id string, value *proto.EncodedObject, err error) *Envelope {
 	msg := &ObjectResponse{
 		ID:    id,
 		Value: value,
 		Error: err.Error(),
 	}
-	return NewEnvelope(source, msg)
+	return NewEnvelope(source, target, msg)
 }
 
-func NewStreamChunk(source string, chunk *proto.StreamChunk) *Envelope {
-	return NewEnvelope(source, chunk)
+func NewStreamChunk(source, target string, chunk *proto.StreamChunk) *Envelope {
+	return NewEnvelope(source, target, chunk)
 }
 
-func NewEnvelope(source string, msg pb.Message) *Envelope {
+func NewEnvelope(source, target string, msg pb.Message) *Envelope {
 	e := &Envelope{
-		Target: source,
+		Source: source,
+		Target: target,
 	}
 	switch msg := msg.(type) {
 	case *ObjectRequest:

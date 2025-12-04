@@ -11,29 +11,19 @@ import (
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/asynkron/protoactor-go/actor"
-	"github.com/asynkron/protoactor-go/remote"
 )
 
-func TestGlobal(t *testing.T) {
+func TestTCPObject(t *testing.T) {
 	sys1 := actor.NewActorSystem()
 	sys2 := actor.NewActorSystem()
 	ctx1 := sys1.Root
 	ctx2 := sys2.Root
 
-	r1 := router.NewLocalRouter(ctx1)
-	r2 := router.NewLocalRouter(ctx2)
+	storeRef1 := store.Spawn(ctx1, router.NewTCPRouter(ctx1, nil, "127.0.0.1", 3000), "store-1")
+	pid := actor.NewPID("127.0.0.1:3000", "bootstrap")
+	storeRef2 := store.Spawn(ctx2, router.NewTCPRouter(ctx2, pid, "127.0.0.1", 3001), "store-2")
 
-	// 在:3000和:3001端口启动两个远程Actor系统，模拟多机部署
-	remoter1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
-	remoter2 := remote.NewRemote(sys2, remote.Configure("127.0.0.1", 3001))
-	remoter1.Start()
-	remoter2.Start()
-
-	storeRef1 := store.Spawn(ctx1, r1, "store1")
-	storeRef2 := store.Spawn(ctx2, r2, "store2")
-
-	r1.Register(storeRef2)
-	r2.Register(storeRef1)
+	time.Sleep(100 * time.Millisecond)
 
 	wg := sync.WaitGroup{}
 	wg.Add(10)
@@ -79,26 +69,17 @@ func TestGlobal(t *testing.T) {
 	wg.Wait()
 }
 
-func TestGlobalStream(t *testing.T) {
+func TestTCPStream(t *testing.T) {
 	sys1 := actor.NewActorSystem()
 	sys2 := actor.NewActorSystem()
 	ctx1 := sys1.Root
 	ctx2 := sys2.Root
 
-	r1 := router.NewLocalRouter(ctx1)
-	r2 := router.NewLocalRouter(ctx2)
+	storeRef1 := store.Spawn(ctx1, router.NewTCPRouter(ctx1, nil, "127.0.0.1", 3000), "store-1")
+	pid := actor.NewPID("127.0.0.1:3000", "bootstrap")
+	storeRef2 := store.Spawn(ctx2, router.NewTCPRouter(ctx2, pid, "127.0.0.1", 3001), "store-2")
 
-	// 在:3000和:3001端口启动两个远程Actor系统，模拟多机部署
-	remoter1 := remote.NewRemote(sys1, remote.Configure("127.0.0.1", 3000))
-	remoter2 := remote.NewRemote(sys2, remote.Configure("127.0.0.1", 3001))
-	remoter1.Start()
-	remoter2.Start()
-
-	storeRef1 := store.Spawn(ctx1, r1, "store1")
-	storeRef2 := store.Spawn(ctx2, r2, "store2")
-
-	r1.Register(storeRef2)
-	r2.Register(storeRef1)
+	time.Sleep(100 * time.Millisecond)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
