@@ -61,9 +61,6 @@ func (r *STUNRouter) handleEnvelope(envelope *cluster.Envelope) {
 		return
 	}
 
-	// record source to route
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.ctx.Logger().Info(
 		"router: receive message",
 		"target", targetId,
@@ -117,6 +114,5 @@ func NewSTUNRouter(ctx Context, source, signalingServer string) *STUNRouter {
 	}()
 
 	router.sender = sender
-
 	return router
 }

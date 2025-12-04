@@ -3,22 +3,22 @@
 package router
 
 import (
-	"log/slog"
 	"sync"
 
+	"github.com/9triver/ignis/proto"
 	"github.com/asynkron/protoactor-go/actor"
 )
 
 // Context is a hack for `actor.Context` and `*actor.RootContext`, since these two types are not
 // compatible.
 type Context interface {
-	Send(pid *actor.PID, msg any)
-	Logger() *slog.Logger
+	actor.SenderContext
+	actor.SpawnerContext
 }
 
 type Router interface {
 	Send(targetId string, msg any)
-	Register(targetId string, pid *actor.PID)
+	Register(store *proto.StoreRef)
 	Deregister(targetId string)
 }
 
@@ -34,11 +34,18 @@ type baseRouter struct {
 //   - pid: Actor 进程 ID
 //
 // 如果目标已存在，会覆盖旧的 PID
-func (r *baseRouter) Register(targetId string, pid *actor.PID) {
+// func (r *baseRouter) Register(targetId string, pid *actor.PID) {
+// 	r.mu.Lock()
+// 	defer r.mu.Unlock()
+
+// 	r.routes[targetId] = pid
+// }
+
+func (r *baseRouter) Register(store *proto.StoreRef) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.routes[targetId] = pid
+	r.routes[store.ID] = store.PID
 }
 
 // Unregister 注销目标 Actor
@@ -49,6 +56,18 @@ func (r *baseRouter) Deregister(targetId string) {
 	defer r.mu.Unlock()
 
 	delete(r.routes, targetId)
+}
+
+func (r *baseRouter) Send(targetId string, msg any) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	pid, ok := r.routes[targetId]
+	if !ok {
+		return
+	}
+
+	r.ctx.Send(pid, msg)
 }
 
 func makeBaseRouter(ctx Context) baseRouter {
