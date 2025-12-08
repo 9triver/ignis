@@ -355,13 +355,15 @@ func Spawn(ctx *actor.RootContext, router router.Router, id string) *proto.Store
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return s
 	})
-	pid, _ := ctx.SpawnNamed(props, "store."+id)
-	router.Register(id, pid)
+	pid, _ := ctx.SpawnNamed(props, id)
 	ref := &proto.StoreRef{
 		ID:  id,
 		PID: pid,
 	}
 	s.ref = ref
+
+	router.Register(ref)
+
 	return ref
 }
 
