@@ -5,17 +5,13 @@ package platform
 import (
 	"context"
 	"path"
-<<<<<<< HEAD
-=======
 	"sync"
->>>>>>> master
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
 
 	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/configs"
-	"github.com/9triver/ignis/monitor"
 	"github.com/9triver/ignis/platform/control"
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
@@ -33,22 +29,6 @@ import (
 //   - 应用注册和生命周期管理
 //   - 任务部署和调度
 type Platform struct {
-<<<<<<< HEAD
-	// Root context of platform
-	ctx context.Context
-	// Main actor system of the platform
-	sys *actor.ActorSystem
-	// Control connection manager
-	cm remote.ControllerManager
-	// Executor connection manager
-	em remote.ExecutorManager
-	// Deployer
-	dp task.Deployer
-	// Monitor system
-	monitor monitor.Monitor
-	// Controller actor refs
-	controllerActorRefs map[string]*proto.ActorRef
-=======
 	ctx                 context.Context             // 平台根上下文
 	sys                 *actor.ActorSystem          // Actor 系统
 	cm                  transport.ControllerManager // 控制器连接管理器
@@ -57,7 +37,6 @@ type Platform struct {
 	appInfos            map[string]*ApplicationInfo // 应用信息映射表
 	controllerActorRefs map[string]*proto.ActorRef  // 控制器 Actor 引用映射表
 	mu                  sync.RWMutex                // 保护应用信息的读写锁
->>>>>>> master
 }
 
 // Run 启动平台并阻塞运行
@@ -93,75 +72,13 @@ func (p *Platform) Run() error {
 		}
 	}()
 
-<<<<<<< HEAD
-	go func() {
-		logrus.Info("Waiting for new client connection...")
-		for {
-			ctrlr := p.cm.NextController()
-			if ctrlr == nil {
-				continue
-			}
-			logrus.Info("New client is connected")
-			msg := <-ctrlr.RecvChan()
-			if msg.Type == controller.CommandType_FR_REGISTER_REQUEST {
-				req := msg.GetRegisterRequest()
-				if req == nil {
-					logrus.Error("Register request is nil")
-					continue
-				}
-				appID := req.GetApplicationID()
-
-				// 检查应用是否已注册
-				if info, _ := p.monitor.GetApplicationInfo(ctx, appID); info != nil {
-					logrus.Errorf("Application ID %s is conflicted", appID)
-					continue
-				}
-
-				// 注册应用
-				if err := p.monitor.RegisterApplication(ctx, appID, &monitor.ApplicationMetadata{
-					AppID: appID,
-					Name:  appID,
-				}); err != nil {
-					logrus.Errorf("Failed to register application %s: %v", appID, err)
-					continue
-				}
-
-				actorRef := control.SpawnTaskControllerV2(p.sys.Root, appID, p.dp, p.monitor, ctx, ctrlr, func() {
-					// 应用关闭时注销
-					if err := p.monitor.UnregisterApplication(context.Background(), appID); err != nil {
-						logrus.Errorf("Failed to unregister application %s: %v", appID, err)
-					}
-				})
-
-				p.controllerActorRefs[appID] = actorRef
-				logrus.Infof("Application %s is registered", appID)
-
-				ack := controller.NewAck(nil)
-				ctrlr.SendChan() <- ack
-			} else {
-				logrus.Errorf("The first message %s is not register request", msg.Type)
-			}
-		}
-	}()
-=======
 	// 启动客户端注册循环
 	go p.handleClientRegistrations(ctx)
->>>>>>> master
 
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-<<<<<<< HEAD
-// NewPlatform 创建一个新的 Platform 实例
-// mon: 监控实例，如果为 nil 则使用默认的空操作监控
-func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer, mon monitor.Monitor) *Platform {
-	if mon == nil {
-		// 使用默认的空操作监控
-		mon = monitor.DefaultMonitor()
-	}
-
-=======
 // handleClientRegistrations 处理客户端注册请求
 // 参数:
 //   - ctx: 上下文
@@ -259,7 +176,6 @@ func (p *Platform) registerApplication(ctrlr transport.Controller) error {
 //  3. 创建 RPC 控制器管理器（用于客户端）
 //  4. 如果未提供部署器，创建默认的虚拟环境管理器
 func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platform {
->>>>>>> master
 	opt := utils.WithLogger()
 	ipcAddr := "ipc://" + path.Join(configs.StoragePath, "em-ipc")
 
@@ -285,11 +201,6 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 	}
 }
 
-<<<<<<< HEAD
-// GetMonitor 返回 Platform 的监控实例
-func (p *Platform) GetMonitor() monitor.Monitor {
-	return p.monitor
-=======
 // GetApplicationInfo 获取指定应用的信息
 // 参数:
 //   - appID: 应用标识符
@@ -319,5 +230,4 @@ func NewApplicationInfo(appID string) *ApplicationInfo {
 	return &ApplicationInfo{
 		ID: appID,
 	}
->>>>>>> master
 }
