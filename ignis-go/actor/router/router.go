@@ -1,101 +1,78 @@
+// Package router 提供了基于 Proto Actor 的消息路由功能
+// 支持将消息根据目标 ID 路由到对应的 Actor PID
 package router
 
 import (
-	"log/slog"
 	"sync"
 
+	"github.com/9triver/ignis/proto"
 	"github.com/asynkron/protoactor-go/actor"
-	"github.com/sirupsen/logrus"
 )
 
+// Context is a hack for `actor.Context` and `*actor.RootContext`, since these two types are not
+// compatible.
 type Context interface {
-	Send(pid *actor.PID, msg any)
-	Logger() *slog.Logger
+	actor.SenderContext
+	actor.SpawnerContext
 }
 
-var DefaultRouter = NewRouter()
-
-func Send(ctx Context, targetId string, msg any) {
-	DefaultRouter.Send(ctx, targetId, msg)
+type Router interface {
+	Send(targetId string, msg any)
+	Register(store *proto.StoreRef)
+	Deregister(targetId string)
 }
 
-func Register(targetId string, pid *actor.PID) {
-	DefaultRouter.Register(targetId, pid)
+type baseRouter struct {
+	mu     sync.RWMutex // 读写锁，保护路由表和默认目标
+	ctx    Context
+	routes map[string]*actor.PID // 路由表，key 为目标 ID
 }
 
-func Unregister(targetId string) {
-	DefaultRouter.Unregister(targetId)
-}
+// Register 注册目标 Actor
+// 参数:
+//   - targetId: 目标 Actor 标识符
+//   - pid: Actor 进程 ID
+//
+// 如果目标已存在，会覆盖旧的 PID
+// func (r *baseRouter) Register(targetId string, pid *actor.PID) {
+// 	r.mu.Lock()
+// 	defer r.mu.Unlock()
 
-func RegisterIfAbsent(targetId string, pid *actor.PID) {
-	DefaultRouter.RegisterIfAbsent(targetId, pid)
-}
+// 	r.routes[targetId] = pid
+// }
 
-func SetDefaultTarget(pid *actor.PID) {
-	DefaultRouter.SetDefaultTarget(pid)
-}
-
-type Router struct {
-	mu            sync.Mutex
-	routeTable    map[string]*actor.PID
-	defaultTarget *actor.PID
-}
-
-func NewRouter() *Router {
-	return &Router{
-		routeTable: make(map[string]*actor.PID),
-	}
-}
-
-func (r *Router) Send(ctx Context, targetId string, msg any) {
-	r.mu.Lock() // TODO: use read lock
+func (r *baseRouter) Register(store *proto.StoreRef) {
+	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	pid, ok := r.routeTable[targetId]
+	r.routes[store.ID] = store.PID
+}
+
+// Unregister 注销目标 Actor
+// 参数:
+//   - targetId: 目标 Actor 标识符
+func (r *baseRouter) Deregister(targetId string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.routes, targetId)
+}
+
+func (r *baseRouter) Send(targetId string, msg any) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	pid, ok := r.routes[targetId]
 	if !ok {
-		if r.defaultTarget == nil {
-			ctx.Logger().Error("target not found", "targetId", targetId)
-			return
-		} else {
-			ctx.Logger().Info("use default target", "targetId", targetId, "default target pid", r.defaultTarget)
-			pid = r.defaultTarget
-		}
-	}
-
-	// ctx.Logger().Debug("route message to target", "targetId", targetId, "pid", pid, "msg", msg)
-	ctx.Send(pid, msg)
-}
-
-func (r *Router) SetDefaultTarget(pid *actor.PID) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.defaultTarget = pid
-	logrus.Info("set default target", "pid", pid)
-}
-
-func (r *Router) Register(targetId string, pid *actor.PID) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.routeTable[targetId] = pid
-}
-
-func (r *Router) Unregister(targetId string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	delete(r.routeTable, targetId)
-}
-
-// TODO: 根据消息最短路径，动态更新路由表
-func (r *Router) RegisterIfAbsent(targetId string, pid *actor.PID) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, ok := r.routeTable[targetId]; ok {
 		return
 	}
 
-	r.routeTable[targetId] = pid
+	r.ctx.Send(pid, msg)
+}
+
+func makeBaseRouter(ctx Context) baseRouter {
+	return baseRouter{
+		ctx:    ctx,
+		routes: make(map[string]*actor.PID),
+	}
 }

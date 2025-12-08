@@ -9,22 +9,25 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
 
-	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/remote"
-	"github.com/9triver/ignis/actor/router"
+	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/store"
+<<<<<<< HEAD
 	"github.com/9triver/ignis/monitor"
 	"github.com/9triver/ignis/objects"
+=======
+	"github.com/9triver/ignis/object"
+>>>>>>> master
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
+	"github.com/9triver/ignis/transport"
 	"github.com/9triver/ignis/utils/errors"
 )
 
 type Controller struct {
 	id         string
-	manager    *functions.VenvManager
-	controller remote.Controller
+	manager    *python.VenvManager
+	controller transport.Controller
 	store      *proto.StoreRef
 	appID      string
 	monitor    monitor.Monitor
@@ -209,6 +212,7 @@ func (c *Controller) onInvoke(ctx actor.Context, invoke *controller.Invoke) {
 	rt.Start(ctx)
 }
 
+<<<<<<< HEAD
 func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
 	ctx.Logger().Info("control: append DAG",
 		"node num", len(dag.Nodes),
@@ -227,6 +231,8 @@ func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.M
 	})
 }
 
+=======
+>>>>>>> master
 func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controller.RequestObject) {
 	ctx.Logger().Info("control: request object",
 		"id", requestObject.ID,
@@ -237,7 +243,7 @@ func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controlle
 			ID:  c.store.ID,
 			PID: c.store.PID,
 		},
-	}).OnDone(func(obj objects.Interface, duration time.Duration, err error) {
+	}).OnDone(func(obj object.Interface, duration time.Duration, err error) {
 		if err != nil {
 			ctx.Logger().Error("control: request object error",
 				"id", requestObject.ID,
@@ -268,10 +274,6 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 		c.onAppendArg(ctx, cmd.AppendArg)
 	case *controller.Message_Invoke:
 		c.onInvoke(ctx, cmd.Invoke)
-	case *controller.Message_DAG:
-		c.onDAG(ctx, cmd.DAG)
-	case *controller.Message_MarkDAGNodeDone:
-		c.onMarkDAGNodeDone(ctx, cmd.MarkDAGNodeDone)
 	case *controller.Message_RequestObject:
 		c.onRequestObject(ctx, cmd.RequestObject)
 	}
@@ -351,8 +353,8 @@ func (c *Controller) Receive(ctx actor.Context) {
 func SpawnTaskController(
 	ctx *actor.RootContext,
 	store *proto.StoreRef,
-	venvs *functions.VenvManager,
-	cm remote.ControllerManager,
+	venvs *python.VenvManager,
+	cm transport.ControllerManager,
 	onClose func(),
 ) *proto.ActorRef {
 	c := cm.NextController()
@@ -384,7 +386,11 @@ func SpawnTaskController(
 
 // For iarnet
 func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.Deployer,
+<<<<<<< HEAD
 	mon monitor.Monitor, appCtx context.Context, c remote.Controller, onClose func()) *proto.ActorRef {
+=======
+	appInfo ApplicationInfo, c transport.Controller, onClose func()) *proto.ActorRef {
+>>>>>>> master
 
 	store := store.Spawn(ctx, nil, "store-"+appID)
 
@@ -413,8 +419,6 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 			ctx.Send(pid, msg)
 		}
 	}()
-
-	router.Register(controllerId, pid)
 
 	return &proto.ActorRef{
 		// Store: store,

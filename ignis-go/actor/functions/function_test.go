@@ -3,7 +3,8 @@ package functions
 import (
 	"testing"
 
-	"github.com/9triver/ignis/objects"
+	"github.com/9triver/ignis/actor/functions/remote"
+	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/utils/errors"
 )
 
@@ -32,9 +33,9 @@ func TestStreamJoinFunc(t *testing.T) {
 		}
 	}()
 
-	f := NewGo("sum", innerFunc, objects.LangGo)
-	s := objects.NewStream(inputs, objects.LangGo)
-	invoke := map[string]objects.Interface{}
+	f := NewGo("sum", innerFunc, object.LangGo)
+	s := object.NewStream(inputs, object.LangGo)
+	invoke := map[string]object.Interface{}
 	invoke["Ints"] = s
 	r, err := f.Call(invoke)
 	if err != nil {
@@ -77,16 +78,16 @@ func TestStreamStreamFunc(t *testing.T) {
 		return O{Sum: sum}, nil
 	}
 
-	f1 := NewGo("genInts", generateInts, objects.LangGo)
-	invoke := map[string]objects.Interface{}
-	invoke["Num"] = objects.NewLocal(10, objects.LangGo)
+	f1 := NewGo("genInts", generateInts, object.LangGo)
+	invoke := map[string]object.Interface{}
+	invoke["Num"] = object.NewLocal(10, object.LangGo)
 	r1, err := f1.Call(invoke)
 	if err != nil {
 		t.Fatal(errors.Stacktrace(err))
 	}
 
-	f2 := NewGo("getSum", getSum, objects.LangGo)
-	invoke2 := map[string]objects.Interface{}
+	f2 := NewGo("getSum", getSum, object.LangGo)
+	invoke2 := map[string]object.Interface{}
 	invoke2["Ints"] = r1
 	r2, err := f2.Call(invoke2)
 	if err != nil {
@@ -95,4 +96,19 @@ func TestStreamStreamFunc(t *testing.T) {
 
 	v, _ := r2.Value()
 	t.Log(v)
+}
+
+func TestRemote(t *testing.T) {
+	manager := remote.NewManager("0.0.0.0", 8085)
+	f := NewRemote(manager, "add", []string{"a", "b"}, "unikernel")
+	obj, err := f.Call(map[string]object.Interface{
+		"a": object.NewLocal(10, object.LangJson),
+		"b": object.NewLocal(20, object.LangJson),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(obj, 111)
 }
