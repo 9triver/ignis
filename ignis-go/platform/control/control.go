@@ -206,22 +206,6 @@ func (c *Controller) onInvoke(ctx actor.Context, invoke *controller.Invoke) {
 	rt.Start(ctx)
 }
 
-func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
-	ctx.Logger().Info("control: append DAG",
-		"node num", len(dag.Nodes),
-	)
-	c.appInfo.SetDAG(dag)
-}
-
-func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.MarkDAGNodeDone) {
-	ctx.Logger().Info("control: mark DAG node done",
-		"nodeID", markDone.NodeId,
-	)
-
-	// Update the application info with the node completion
-	c.appInfo.MarkNodeDone(markDone.NodeId)
-}
-
 func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controller.RequestObject) {
 	ctx.Logger().Info("control: request object",
 		"id", requestObject.ID,
@@ -263,10 +247,6 @@ func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Mess
 		c.onAppendArg(ctx, cmd.AppendArg)
 	case *controller.Message_Invoke:
 		c.onInvoke(ctx, cmd.Invoke)
-	case *controller.Message_DAG:
-		c.onDAG(ctx, cmd.DAG)
-	case *controller.Message_MarkDAGNodeDone:
-		c.onMarkDAGNodeDone(ctx, cmd.MarkDAGNodeDone)
 	case *controller.Message_RequestObject:
 		c.onRequestObject(ctx, cmd.RequestObject)
 	}

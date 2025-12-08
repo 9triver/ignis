@@ -6,7 +6,6 @@ import (
 	"context"
 	"path"
 	"sync"
-	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
@@ -202,25 +201,6 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 	}
 }
 
-// GetApplicationDAG 获取指定应用的 DAG（有向无环图）
-// 参数:
-//   - appID: 应用标识符
-//
-// 返回值:
-//   - *controller.DAG: 应用的 DAG，如果应用不存在则返回 nil
-func (p *Platform) GetApplicationDAG(appID string) *controller.DAG {
-	logrus.Infof("GetApplicationDAG: %s", appID)
-
-	p.mu.RLock()
-	appInfo, ok := p.appInfos[appID]
-	p.mu.RUnlock()
-
-	if !ok {
-		return nil
-	}
-	return appInfo.GetDAG()
-}
-
 // GetApplicationInfo 获取指定应用的信息
 // 参数:
 //   - appID: 应用标识符
@@ -234,39 +214,10 @@ func (p *Platform) GetApplicationInfo(appID string) *ApplicationInfo {
 	return p.appInfos[appID]
 }
 
-// NodeState 表示 DAG 节点的状态
-type NodeState struct {
-	ID       string    `json:"id"`       // 节点 ID
-	Type     string    `json:"type"`     // 节点类型: "control" 或 "data"
-	Done     bool      `json:"done"`     // 是否已完成
-	Ready    bool      `json:"ready"`    // 是否已就绪
-	UpdateAt time.Time `json:"updateAt"` // 最后更新时间
-}
-
-// DAGStateChangeEvent 表示 DAG 状态变更事件
-// 当 DAG 中的节点状态发生变化时，会生成该事件并通知观察者
-type DAGStateChangeEvent struct {
-	AppID     string     `json:"appId"`     // 应用 ID
-	NodeID    string     `json:"nodeId"`    // 节点 ID
-	NodeState *NodeState `json:"nodeState"` // 节点状态
-	Timestamp time.Time  `json:"timestamp"` // 事件时间戳
-}
-
-// StateChangeObserver 定义状态变更观察者接口
-// 实现该接口可以监听 DAG 状态变化
-type StateChangeObserver interface {
-	// OnDAGStateChanged 当 DAG 状态变化时调用
-	OnDAGStateChanged(event *DAGStateChangeEvent)
-}
-
 // ApplicationInfo 存储应用的信息和状态
-// 包括 DAG、节点状态、观察者列表等
 type ApplicationInfo struct {
-	ID         string                // 应用 ID
-	dag        *controller.DAG       // 应用的 DAG
-	nodeStates map[string]*NodeState // 节点状态映射表
-	observers  []StateChangeObserver // 状态变更观察者列表
-	mutex      sync.RWMutex          // 保护并发访问的读写锁
+	ID    string       // 应用 ID
+	mutex sync.RWMutex // 保护并发访问的读写锁
 }
 
 // NewApplicationInfo 创建一个新的应用信息实例
@@ -277,151 +228,6 @@ type ApplicationInfo struct {
 //   - *ApplicationInfo: 应用信息实例
 func NewApplicationInfo(appID string) *ApplicationInfo {
 	return &ApplicationInfo{
-		ID:         appID,
-		nodeStates: make(map[string]*NodeState),
-		observers:  make([]StateChangeObserver, 0),
-	}
-}
-
-// SetDAG 设置应用的 DAG 并初始化节点状态
-// 参数:
-//   - dag: DAG 对象
-//
-// 该方法会：
-//  1. 保存 DAG 引用
-//  2. 从 DAG 中提取所有节点
-//  3. 为每个节点创建初始状态
-//  4. 区分控制节点和数据节点进行不同的初始化
-func (a *ApplicationInfo) SetDAG(dag *controller.DAG) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	a.dag = dag
-
-	// Initialize node states from DAG
-	if a.nodeStates == nil {
-		a.nodeStates = make(map[string]*NodeState)
-	}
-
-	for _, node := range dag.Nodes {
-		var nodeState *NodeState
-		if node.Type == "ControlNode" && node.GetControlNode() != nil {
-			cn := node.GetControlNode()
-			nodeState = &NodeState{
-				ID:       cn.Id,
-				Type:     "control",
-				Done:     cn.Done,
-				Ready:    true, // Control nodes are ready by default
-				UpdateAt: time.Now(),
-			}
-		} else if node.Type == "DataNode" && node.GetDataNode() != nil {
-			dn := node.GetDataNode()
-			nodeState = &NodeState{
-				ID:       dn.Id,
-				Type:     "data",
-				Done:     dn.Done,
-				Ready:    dn.Ready,
-				UpdateAt: time.Now(),
-			}
-		}
-
-		if nodeState != nil {
-			a.nodeStates[nodeState.ID] = nodeState
-		}
-	}
-}
-
-// GetDAG 获取应用的 DAG
-// 返回值:
-//   - *controller.DAG: DAG 对象
-//
-// 该方法是线程安全的
-func (a *ApplicationInfo) GetDAG() *controller.DAG {
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
-	return a.dag
-}
-
-// MarkNodeDone 标记节点为已完成并通知观察者
-// 参数:
-//   - nodeID: 节点 ID
-//
-// 执行操作:
-//  1. 更新节点状态为 Done
-//  2. 同步更新 DAG 中的节点状态
-//  3. 生成状态变更事件
-//  4. 异步通知所有观察者
-func (a *ApplicationInfo) MarkNodeDone(nodeID string) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
-	if nodeState, exists := a.nodeStates[nodeID]; exists {
-		nodeState.Done = true
-		nodeState.UpdateAt = time.Now()
-
-		// Update the DAG node state as well
-		if a.dag != nil {
-			for _, node := range a.dag.Nodes {
-				if node.Type == "ControlNode" && node.GetControlNode() != nil && node.GetControlNode().Id == nodeID {
-					node.GetControlNode().Done = true
-				} else if node.Type == "DataNode" && node.GetDataNode() != nil && node.GetDataNode().Id == nodeID {
-					node.GetDataNode().Done = true
-				}
-			}
-		}
-
-		// Notify observers
-		event := &DAGStateChangeEvent{
-			AppID:     a.ID,
-			NodeID:    nodeID,
-			NodeState: nodeState,
-			Timestamp: time.Now(),
-		}
-
-		for _, observer := range a.observers {
-			go observer.OnDAGStateChanged(event)
-		}
-	}
-}
-
-// GetNodeStates 获取所有节点的状态
-// 返回值:
-//   - map[string]*NodeState: 节点状态映射表的副本
-//
-// 该方法返回副本以避免并发访问问题，是线程安全的
-func (a *ApplicationInfo) GetNodeStates() map[string]*NodeState {
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
-
-	// 返回副本以避免竞态条件
-	states := make(map[string]*NodeState)
-	for k, v := range a.nodeStates {
-		stateCopy := *v
-		states[k] = &stateCopy
-	}
-	return states
-}
-
-// AddObserver 添加状态变更观察者
-// 参数:
-//   - observer: 观察者实例
-//
-// 观察者会在节点状态变化时收到通知
-func (a *ApplicationInfo) AddObserver(observer StateChangeObserver) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	a.observers = append(a.observers, observer)
-}
-
-// RemoveObserver 移除状态变更观察者
-// 参数:
-//   - observer: 要移除的观察者实例
-func (a *ApplicationInfo) RemoveObserver(observer StateChangeObserver) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	for i, obs := range a.observers {
-		if obs == observer {
-			a.observers = append(a.observers[:i], a.observers[i+1:]...)
-			break
-		}
+		ID: appID,
 	}
 }
