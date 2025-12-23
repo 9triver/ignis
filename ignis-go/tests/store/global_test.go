@@ -63,12 +63,16 @@ func TestGlobal(t *testing.T) {
 	ctx2.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 		switch msg := c.Message().(type) {
 		case *actor.Started:
-			for flow := range refs {
-				c.Send(storeRef2.PID, &store.RequestObject{
-					ReplyTo: c.Self(),
-					Flow:    flow,
-				})
-			}
+			go func() {
+				for flow := range refs {
+					c.Send(storeRef2.PID, &store.RequestObject{
+						ReplyTo: c.Self(),
+						Flow:    flow,
+					})
+					time.Sleep(500 * time.Millisecond)
+				}
+			}()
+
 		case *store.ObjectResponse:
 			obj := msg.Value
 			t.Logf("[sys2] received %v", obj)

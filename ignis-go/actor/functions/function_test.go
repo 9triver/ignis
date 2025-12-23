@@ -1,6 +1,7 @@
 package functions
 
 import (
+	_ "embed"
 	"testing"
 
 	"github.com/9triver/ignis/actor/functions/remote"

@@ -87,6 +87,17 @@ func (m *Manager) GetConnection(connId string) *Connection {
 	return <-m.connections[connId]
 }
 
+func (m *Manager) Endpoint() string {
+	var host string
+	if m.host == "0.0.0.0" {
+		host = "127.0.0.1"
+	} else {
+		host = m.host
+	}
+
+	return fmt.Sprintf("http://%s:%d/ws", host, m.port)
+}
+
 func (m *Manager) Run() error {
 	http.HandleFunc("/ws", m.wsHandler)
 	return http.ListenAndServe(fmt.Sprintf("%s:%d", m.host, m.port), nil)

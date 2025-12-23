@@ -21,6 +21,7 @@ enum CommandType {
   FR_MARK_DAG_NODE_DONE = 13; // frontend: notify DAG node done
   FR_REQUEST_OBJECT=14; // frontend: request object from object store
   BK_RESPONSE_OBJECT=15; // backend: response object to request object
+  FR_APPEND_UNIKERNEL = 16;
 }
 
 message Ack {
@@ -83,6 +84,17 @@ message AppendPyClass {
   string Venv = 3; // function virtual environment
   repeated string Requirements = 4; // function dependencies
   bytes PickledObject = 5; // encoded function impl
+  proto.Language Language = 6; // return type of function
+  Resources Resources = 7; // resources required by class
+  int32 Replicas = 8;
+}
+
+message AppendUnikernel {
+  string Name = 1; // function name
+  repeated string Params = 2; // function params
+  string Config = 3; // content of config.ml
+  string Unikernel = 4; // content of unikernek.ml
+  string Target = 5; // content of unikernek.ml
   proto.Language Language = 6; // return type of function
   Resources Resources = 7; // resources required by class
   int32 Replicas = 8;
@@ -193,6 +205,7 @@ message Message {
     MarkDAGNodeDone MarkDAGNodeDone = 14;
     RequestObject RequestObject = 15;
     ResponseObject ResponseObject = 16;
+    AppendUnikernel AppendUnikernel = 17;
   }
 }
 
