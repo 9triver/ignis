@@ -17,13 +17,15 @@ var (
 func TestMirage(t *testing.T) {
 	manager := remote.NewManager("0.0.0.0", 8085)
 
+	t.Logf("[go] building unikernel...")
 	f, err := functions.NewUnikernel(manager, "add", []string{"a", "b"}, handlers)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	t.Logf("[go] calling unikernel...")
 	obj, err := f.Call(map[string]object.Interface{
-		"a": object.NewLocal(20, object.LangJson),
+		"a": object.NewLocal(10, object.LangJson),
 		"b": object.NewLocal(20, object.LangJson),
 	})
 
@@ -31,5 +33,6 @@ func TestMirage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Log(obj, 111)
+	v, _ := obj.Value()
+	t.Logf("[go] receive call result %s: %v", obj.GetID(), v)
 }

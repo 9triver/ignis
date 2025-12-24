@@ -10,11 +10,12 @@ import (
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/utils"
 	"github.com/asynkron/protoactor-go/actor"
 )
 
-func saveObject() (refs []*proto.Flow) {
-	sys := actor.NewActorSystem()
+func saveObject(t *testing.T) (refs []*proto.Flow) {
+	sys := actor.NewActorSystem(utils.WithLogger())
 	ctx := sys.Root
 
 	r := router.NewSTUNRouter(ctx, "s1", "ws://8.153.200.135:28080/ws")
@@ -30,6 +31,7 @@ func saveObject() (refs []*proto.Flow) {
 				c.Send(s.PID, &store.SaveObject{
 					Value: object.LocalWithID(fmt.Sprintf("obj-%d", i), i, object.LangJson),
 					Callback: func(ctx actor.Context, ref *proto.Flow) {
+						t.Logf("[actor-1@sys1] saved %s: %d", ref.ID, i)
 						refs = append(refs, ref)
 						wg.Done()
 					},
@@ -43,48 +45,8 @@ func saveObject() (refs []*proto.Flow) {
 	return
 }
 
-func saveStream() (ref *proto.Flow) {
-	sys := actor.NewActorSystem()
-	ctx := sys.Root
-
-	r := router.NewSTUNRouter(ctx, "s1", "ws://8.153.200.135:28080/ws")
-	s := store.Spawn(ctx, r, "s1")
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	streamID := "stream-0"
-	source := make(chan int, 10)
-	// 创建一个生产者，向流对象中异步写入数据
-	go func() {
-		defer close(source)
-		for i := range 10 {
-			source <- i
-			time.Sleep(500 * time.Millisecond)
-		}
-	}()
-	stream := object.StreamWithID(streamID, source, object.LangJson)
-
-	producer := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
-		switch c.Message().(type) {
-		case *actor.Started:
-			c.Send(s.PID, &store.SaveObject{
-				Value: stream,
-				Callback: func(ctx actor.Context, ref_ *proto.Flow) {
-					wg.Done()
-					ref = ref_
-				},
-			})
-		}
-	}))
-	defer ctx.Stop(producer)
-
-	wg.Wait()
-	return
-}
-
-func loadObject(refs []*proto.Flow) {
-	sys := actor.NewActorSystem()
+func loadObject(t *testing.T, refs []*proto.Flow) {
+	sys := actor.NewActorSystem(utils.WithLogger())
 	ctx := sys.Root
 
 	r := router.NewSTUNRouter(ctx, "s2", "ws://8.153.200.135:28080/ws")
@@ -107,7 +69,7 @@ func loadObject(refs []*proto.Flow) {
 		// 等待所有对象返回: obj-0, obj-1, ..., obj-9
 		case *store.ObjectResponse:
 			obj := msg.Value
-			ctx.Logger().Info("receive obj", "obj", obj)
+			t.Logf("[actor-2@sys2] receive object: %v", obj)
 			wg.Done()
 		}
 	}))
@@ -118,8 +80,55 @@ func loadObject(refs []*proto.Flow) {
 	wg.Wait()
 }
 
-func loadStream(ref *proto.Flow) {
-	sys := actor.NewActorSystem()
+func TestSTUNObject(t *testing.T) {
+	refs := saveObject(t)
+	loadObject(t, refs)
+}
+
+func saveStream(t *testing.T) (ref *proto.Flow) {
+	sys := actor.NewActorSystem(utils.WithLogger())
+	ctx := sys.Root
+
+	r := router.NewSTUNRouter(ctx, "s1", "ws://8.153.200.135:28080/ws")
+	s := store.Spawn(ctx, r, "s1")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	streamID := "stream-0"
+	source := make(chan int, 10)
+	// 创建一个生产者，向流对象中异步写入数据
+	go func() {
+		defer close(source)
+		for i := range 10 {
+			time.Sleep(500 * time.Millisecond)
+			source <- i
+			t.Logf("[actor-1@sys-1] send chunk: %d", i)
+		}
+	}()
+	stream := object.StreamWithID(streamID, source, object.LangJson)
+
+	producer := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
+		switch c.Message().(type) {
+		case *actor.Started:
+			c.Send(s.PID, &store.SaveObject{
+				Value: stream,
+				Callback: func(ctx actor.Context, ref_ *proto.Flow) {
+					t.Logf("[actor-1@sys-1] saved %s", streamID)
+					ref = ref_
+					wg.Done()
+				},
+			})
+		}
+	}))
+	defer ctx.Stop(producer)
+
+	wg.Wait()
+	return
+}
+
+func loadStream(t *testing.T, ref *proto.Flow) {
+	sys := actor.NewActorSystem(utils.WithLogger())
 	ctx := sys.Root
 
 	r := router.NewSTUNRouter(ctx, "s2", "ws://8.153.200.135:28080/ws")
@@ -139,11 +148,9 @@ func loadStream(ref *proto.Flow) {
 		case *store.ObjectResponse:
 			// 获取流对象头
 			obj := msg.Value
-			ctx.Logger().Info("received stream header", "stream", obj)
-
 			// 将头转换为channel，并从流对象中读取数据
-			for val := range obj.(*object.Stream).ToChan() {
-				ctx.Logger().Info("received stream chunk", "chunk", val)
+			for chunk := range obj.(*object.Stream).ToChan() {
+				t.Logf("[actor-2@sys-2] receive chunk: %v", chunk)
 				wg.Done()
 			}
 		}
@@ -155,12 +162,7 @@ func loadStream(ref *proto.Flow) {
 	wg.Wait()
 }
 
-func TestSTUNObject(t *testing.T) {
-	refs := saveObject()
-	loadObject(refs)
-}
-
 func TestSTUNStream(t *testing.T) {
-	ref := saveStream()
-	loadStream(ref)
+	ref := saveStream(t)
+	loadStream(t, ref)
 }

@@ -10,12 +10,13 @@ import (
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/utils"
 	"github.com/asynkron/protoactor-go/actor"
 )
 
 func TestZeroCopy(t *testing.T) {
 	// 初始化Actor运行时
-	sys := actor.NewActorSystem()
+	sys := actor.NewActorSystem(utils.WithLogger())
 	ctx := sys.Root
 	r := router.NewLocalRouter(ctx)
 	// 预先创建存储/传输的对象
@@ -27,6 +28,7 @@ func TestZeroCopy(t *testing.T) {
 		obj := object.LocalWithID(fmt.Sprintf("obj-%d", i), i, object.LangJson)
 		objects = append(objects, obj)
 		pointers = append(pointers, unsafe.Pointer(obj))
+		t.Logf("[actor-1] saved %s, pointer: %x", obj.GetID(), unsafe.Pointer(obj))
 	}
 
 	storeRef := store.Spawn(sys.Root, r, "store")
@@ -63,7 +65,7 @@ func TestZeroCopy(t *testing.T) {
 
 				// 获取对象的地址，并和原对象的地址进行比较
 				pt := unsafe.Pointer(obj.(*object.Local))
-				t.Logf("get: %x, original: %x", pt, pointer)
+				t.Logf("[actor-2] receive object %s, addr: %x, original: %x", obj.GetID(), pt, pointer)
 				if pt != pointer {
 					t.Fatal("zero copy failed!")
 				}

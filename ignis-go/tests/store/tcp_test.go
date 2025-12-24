@@ -10,12 +10,13 @@ import (
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/utils"
 	"github.com/asynkron/protoactor-go/actor"
 )
 
 func TestTCPObject(t *testing.T) {
-	sys1 := actor.NewActorSystem()
-	sys2 := actor.NewActorSystem()
+	sys1 := actor.NewActorSystem(utils.WithLogger())
+	sys2 := actor.NewActorSystem(utils.WithLogger())
 	ctx1 := sys1.Root
 	ctx2 := sys2.Root
 
@@ -28,8 +29,7 @@ func TestTCPObject(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(10)
 	refs := make(chan *proto.Flow, 10)
-	// 在sys1中创建10个对象，并保存到store1
-	// 为简化测试，这里使用本地对象传输object引用，实际应用中应该使用远程对象
+
 	ctx1.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 		switch c.Message().(type) {
 		case *actor.Started:
@@ -61,7 +61,7 @@ func TestTCPObject(t *testing.T) {
 			}
 		case *store.ObjectResponse:
 			obj := msg.Value
-			t.Logf("[sys2] received %v", obj)
+			t.Logf("[sys2] receive %v", obj)
 			wg.Done()
 		}
 	}))
@@ -70,8 +70,8 @@ func TestTCPObject(t *testing.T) {
 }
 
 func TestTCPStream(t *testing.T) {
-	sys1 := actor.NewActorSystem()
-	sys2 := actor.NewActorSystem()
+	sys1 := actor.NewActorSystem(utils.WithLogger())
+	sys2 := actor.NewActorSystem(utils.WithLogger())
 	ctx1 := sys1.Root
 	ctx2 := sys2.Root
 
@@ -84,8 +84,7 @@ func TestTCPStream(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	refs := make(chan *proto.Flow, 10)
-	// 在sys1中创建10个对象，并保存到store1
-	// 为简化测试，这里使用本地对象传输object引用，实际应用中应该使用远程对象
+
 	streamID := "stream-0"
 	source := make(chan int)
 	go func() {
