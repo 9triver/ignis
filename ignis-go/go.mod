@@ -10,6 +10,7 @@ require (
 	github.com/pion/logging v0.2.4
 	github.com/pion/webrtc/v3 v3.3.6
 	github.com/sirupsen/logrus v1.9.3
+	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/zeromq/goczmq.v4 v4.1.0

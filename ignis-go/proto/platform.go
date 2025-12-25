@@ -61,6 +61,10 @@ func (obj *EncodedObject) Value() (any, error) {
 	}
 }
 
+func (obj *EncodedObject) IsStream() bool {
+	return obj.Stream
+}
+
 func (ref *StoreRef) Equals(other *StoreRef) bool {
 	if other == nil {
 		return false

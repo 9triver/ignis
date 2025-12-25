@@ -20,6 +20,7 @@ type Router interface {
 	Send(targetId string, msg any)
 	Register(store *proto.StoreRef)
 	Deregister(targetId string)
+	Shutdown()
 }
 
 type baseRouter struct {
@@ -69,6 +70,8 @@ func (r *baseRouter) Send(targetId string, msg any) {
 
 	r.ctx.Send(pid, msg)
 }
+
+func (r *baseRouter) Shutdown() {}
 
 func makeBaseRouter(ctx Context) baseRouter {
 	return baseRouter{

@@ -43,6 +43,8 @@ type Interface interface {
 	//   - any: 对象值
 	//   - error: 获取错误
 	Value() (any, error)
+
+	IsStream() bool
 }
 
 // 编译时检查类型是否实现了 Interface 接口
@@ -132,6 +134,10 @@ func (obj *Local) Encode() (*Remote, error) {
 // GetLanguage 返回对象所属的语言类型
 func (obj *Local) GetLanguage() Language {
 	return obj.language
+}
+
+func (obj *Local) IsStream() bool {
+	return false
 }
 
 // NewLocal 创建一个新的本地对象，自动生成唯一 ID

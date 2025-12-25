@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -151,7 +150,7 @@ func connectSignalingServer(pSignalingServer string, rID string) *websocket.Conn
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	eh.ErrorHandler(err, 1, eh.LogAndPanic)
 
-	log.Println("connected to signaling server")
+	fmt.Println("connected to signaling server")
 	return conn
 }
 
@@ -178,7 +177,7 @@ func newDataChannelOnOpen(dc *webrtc.DataChannel, pc *webrtc.PeerConnection, nat
 		natSender.Dst2dc.Set(*dst, dc)
 		natSender.Dst2pc.Set(*dst, pc)
 
-		log.Printf("dc to %s is Open\n" + *dst)
+		fmt.Printf("dc to %s is Open\n" + *dst)
 		if succeeded != nil {
 			succeeded <- true
 		}
@@ -187,13 +186,13 @@ func newDataChannelOnOpen(dc *webrtc.DataChannel, pc *webrtc.PeerConnection, nat
 
 func newPeerConnectionOnICEConnectionStateChange() func(connectionState webrtc.ICEConnectionState) {
 	return func(connectionState webrtc.ICEConnectionState) {
-		log.Printf("OnICEConnectionStateChange: %s\n", connectionState.String())
+		fmt.Printf("OnICEConnectionStateChange: %s\n", connectionState.String())
 	}
 }
 
 func newPeerConnectionOnConnectionStateChange(p *webrtc.PeerConnection, natSender *NatSender, dst *string) func(s webrtc.PeerConnectionState) {
 	return func(s webrtc.PeerConnectionState) {
-		log.Printf("OnConnectionStateChange: %s\n", s.String())
+		fmt.Printf("OnConnectionStateChange: %s\n", s.String())
 		// 该部分应该作为网络连接波动时或连接无法建立时的资源回收
 		// 在natSender操控peerConnection.close的接口的时候，不需要加上webrtc.PeerConnectionStateClosed
 		// 因为在此情况下pc.close被调用，说明ns.close被调用，资源已经清理
@@ -201,7 +200,7 @@ func newPeerConnectionOnConnectionStateChange(p *webrtc.PeerConnection, natSende
 			cancel, ok := natSender.dst2cancel.Get(*dst)
 			if !ok {
 				// 防止资源重复释放
-				log.Println("cancel is called more than once")
+				fmt.Println("cancel is called more than once")
 				return
 			}
 			cancel()
@@ -234,7 +233,7 @@ func newPeerConnectionOnConnectionStateChange(p *webrtc.PeerConnection, natSende
 					ip := r.IP
 					port := r.Port
 					natSender.Dst2ConnectionType.Set(*dst, t)
-					log.Printf("connectionType %s, address %s:%d \n", t, ip, port)
+					fmt.Printf("connectionType %s, address %s:%d \n", t, ip, port)
 				}
 			}
 		}
@@ -243,7 +242,7 @@ func newPeerConnectionOnConnectionStateChange(p *webrtc.PeerConnection, natSende
 
 func newPeerConnectionOnSignalingStateChange() func(s webrtc.SignalingState) {
 	return func(s webrtc.SignalingState) {
-		log.Printf("OnSignalingStateChange: %s\n", s.String())
+		fmt.Printf("OnSignalingStateChange: %s\n", s.String())
 	}
 }
 
@@ -257,16 +256,16 @@ func newPeerConnectionOnDataChannel(natSender *NatSender, dst *string, f func(ms
 			natSender.canAccept <- struct{}{}
 			err := dc.SendText("hello from server")
 			eh.ErrorHandler(err, 1, eh.LogAndPanic)
-			log.Printf("dc to %s is open, id is %d\n", *dst, dc.ID())
+			fmt.Printf("dc to %s is open, id is %d\n", *dst, dc.ID())
 		})
 
 		dc.OnClose(func() {
 			// 应该不会单独处理这个，外部不应该手动调用dc的close函数，也不应该看到dc的抽象，应该有peerConnection
-			log.Println("listening dc closed with state " + dc.ReadyState().String())
+			fmt.Println("listening dc closed with state " + dc.ReadyState().String())
 		})
 
 		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-			log.Printf("OnMessage '%s':", *dst)
+			fmt.Printf("OnMessage '%s':", *dst)
 			f(msg.Data)
 		})
 	}
@@ -316,7 +315,7 @@ func sdpHandler(c *connWithMu, ch chan []byte, p *webrtc.PeerConnection, src *st
 			switch msg.Type {
 			case common.Answer:
 				if isClient {
-					log.Println("rev a answer msg")
+					fmt.Println("rev a answer msg")
 					fromTargetedMsg := common.TargetedMsg{}
 					if err := json.Unmarshal([]byte(msg.Data), &fromTargetedMsg); eh.ErrorHandler(err, 1, eh.LogOnly) {
 						continue
@@ -330,17 +329,17 @@ func sdpHandler(c *connWithMu, ch chan []byte, p *webrtc.PeerConnection, src *st
 						continue
 					}
 
-					log.Println("set remote desc for answer ok")
+					fmt.Println("set remote desc for answer ok")
 				} else {
-					log.Println(fmt.Errorf("sdpHandler err: should never receive answer"))
+					fmt.Println(fmt.Errorf("sdpHandler err: should never receive answer"))
 					continue
 				}
 			case common.Offer:
 				if isClient {
-					log.Println(fmt.Errorf("sdpHandler err: should never receive offer"))
+					fmt.Println(fmt.Errorf("sdpHandler err: should never receive offer"))
 					continue
 				} else {
-					log.Println("rev a offer msg")
+					fmt.Println("rev a offer msg")
 					fromTargetedMsg := common.TargetedMsg{}
 					if err := json.Unmarshal([]byte(msg.Data), &fromTargetedMsg); eh.ErrorHandler(err, 1, eh.LogOnly) {
 						continue
@@ -384,7 +383,7 @@ func sdpHandler(c *connWithMu, ch chan []byte, p *webrtc.PeerConnection, src *st
 						Type: common.Answer,
 						Data: string(targetedString),
 					})
-					log.Println("send answer ok")
+					fmt.Println("send answer ok")
 				}
 			case common.Candidate:
 				fromTargetedMsg := common.TargetedMsg{}
@@ -401,7 +400,7 @@ func sdpHandler(c *connWithMu, ch chan []byte, p *webrtc.PeerConnection, src *st
 					continue
 				}
 
-				log.Println("add ice candidate:", candidate)
+				fmt.Println("add ice candidate:", candidate)
 			default:
 				panic("unhandled default case")
 			}
@@ -446,7 +445,7 @@ func sendOffer(o webrtc.SessionDescription, c *connWithMu, src string, dst strin
 		Data: string(targetedString),
 	})
 
-	log.Println("send offer to signaling server ok")
+	fmt.Println("send offer to signaling server ok")
 }
 
 func setPeerConnection(p *webrtc.PeerConnection, natSender *NatSender, src *string, dst *string, f func(msg []byte)) {
@@ -475,12 +474,12 @@ func (natSender *NatSender) dial(dst string) *webrtc.DataChannel {
 
 		dc.OnOpen(newDataChannelOnOpen(dc, peerConnection, natSender, destination, succeeded))
 		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-			log.Printf("OnMessage '%s':", dst)
+			fmt.Printf("OnMessage '%s':", dst)
 			natSender.onMessage(msg.Data)
 		})
 
 		dc.OnClose(func() {
-			log.Println("sender dc closed with state " + dc.ReadyState().String())
+			fmt.Println("sender dc closed with state " + dc.ReadyState().String())
 		})
 
 		ch := make(chan []byte)
@@ -492,7 +491,7 @@ func (natSender *NatSender) dial(dst string) *webrtc.DataChannel {
 		sendOffer(offer, natSender.signalingServerConn, *source, *destination)
 		select {
 		case <-time.After(time.Second * 5):
-			log.Println("dial time out")
+			fmt.Println("dial time out")
 			eh.ErrorHandler(dc.Close(), 1, eh.LogAndPanic)
 			eh.ErrorHandler(peerConnection.Close(), 1, eh.LogAndPanic)
 			close(ch)
@@ -510,7 +509,7 @@ func (natSender *NatSender) dial(dst string) *webrtc.DataChannel {
 func (natSender *NatSender) Send(dst string, data []byte) {
 	dc := natSender.dial(dst)
 	if dc == nil || dc.ReadyState() != webrtc.DataChannelStateOpen {
-		log.Println("destination is not online")
+		fmt.Println("destination is not online")
 		return
 	}
 	eh.ErrorHandler(dc.Send(data), 1, eh.LogAndPanic)

@@ -1,12 +1,13 @@
 package utils
 
 import (
-	"github.com/asynkron/protoactor-go/actor"
-	"github.com/lmittmann/tint"
 	"io"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/asynkron/protoactor-go/actor"
+	"github.com/lmittmann/tint"
 
 	"github.com/lithammer/shortuuid/v4"
 )
@@ -24,7 +25,7 @@ func WithLogger(logPaths ...string) actor.ConfigOption {
 	return actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
 		return slog.New(tint.NewHandler(io.MultiWriter(writers...), &tint.Options{
 			AddSource:  true,
-			Level:      slog.LevelDebug,
+			Level:      slog.LevelError,
 			TimeFormat: time.DateTime,
 		})).With("system", system.ID)
 	})
