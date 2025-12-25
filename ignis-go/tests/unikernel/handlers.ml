@@ -7,3 +7,7 @@ let add value =
     | Some a, Some b -> Ok (`Int (a + b))
     | _, _ -> Error "function is not valid"
   with Type_error (msg, _) -> Error ("input type error")
+
+let handlers = [
+  "add", add;
+]

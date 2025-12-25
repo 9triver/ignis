@@ -9,19 +9,19 @@ enum CommandType {
   ACK = 1; // acknowledged
   FR_READY = 2;
   FR_APPEND_DATA = 3; // frontend: append data node
-  FR_APPEND_ACTOR = 4; // front: append actor (for debugging purpose)
+  FR_APPEND_GO = 4; // front: append actor (for debugging purpose)
   FR_APPEND_PY_FUNC = 5; // frontend: append python function (control node definition)
   FR_APPEND_PY_CLASS = 6; // frontend: append python class (control node definition)
-  FR_APPEND_ARG = 7; // frontend: append function arg to specified actor
-  FR_APPEND_CLASS_METHOD_ARG = 8; // frontend: append class method arg to specified actor
-  FR_INVOKE = 9;
-  BK_RETURN_RESULT = 10; // backend: send back execution result
-  FR_REGISTER_REQUEST = 11; // backend: register application
-  FR_DAG = 12; // frontend: send DAG structure
-  FR_MARK_DAG_NODE_DONE = 13; // frontend: notify DAG node done
-  FR_REQUEST_OBJECT=14; // frontend: request object from object store
-  BK_RESPONSE_OBJECT=15; // backend: response object to request object
-  FR_APPEND_UNIKERNEL = 16;
+  FR_APPEND_UNIKERNEL = 7;
+  FR_APPEND_ARG = 8; // frontend: append function arg to specified actor
+  FR_APPEND_CLASS_METHOD_ARG = 9; // frontend: append class method arg to specified actor
+  FR_INVOKE = 10;
+  BK_RETURN_RESULT = 11; // backend: send back execution result
+  FR_REGISTER_REQUEST = 12; // backend: register application
+  FR_DAG = 13; // frontend: send DAG structure
+  FR_MARK_DAG_NODE_DONE = 14; // frontend: notify DAG node done
+  FR_REQUEST_OBJECT = 15; // frontend: request object from object store
+  BK_RESPONSE_OBJECT = 16; // backend: response object to request object
 }
 
 message Ack {
@@ -48,12 +48,6 @@ message Data {
 message AppendData {
   string SessionID = 1; // current execution session, empty if shared by all sessions
   proto.EncodedObject Object = 2; // encoded object
-}
-
-message AppendActor {
-  string Name = 1; // actor name
-  repeated string Params = 2; // function params
-  proto.ActorRef Ref = 3; // Ref to actor
 }
 
 message Resources {
@@ -89,15 +83,21 @@ message AppendPyClass {
   int32 Replicas = 8;
 }
 
+message AppendGo {
+  string Name = 1; // function name
+  repeated string Params = 2; // function params
+  proto.Language Language = 3; // return type of function
+  Resources Resources = 4; // resources required by class
+  int32 Replicas = 5;
+}
+
 message AppendUnikernel {
   string Name = 1; // function name
   repeated string Params = 2; // function params
-  string Config = 3; // content of config.ml
-  string Unikernel = 4; // content of unikernek.ml
-  string Target = 5; // content of unikernek.ml
-  proto.Language Language = 6; // return type of function
-  Resources Resources = 7; // resources required by class
-  int32 Replicas = 8;
+  string Unikernel = 3; // content of unikernel.ml
+  proto.Language Language = 4; // return type of function
+  Resources Resources = 5; // resources required by class
+  int32 Replicas = 6;
 }
 
 message AppendArg {
@@ -193,19 +193,19 @@ message Message {
     Ack Ack = 2;
     Ready Ready = 3;
     AppendData AppendData = 4;
-    AppendActor AppendActor = 5;
+    AppendGo AppendGo = 5;
     AppendPyFunc AppendPyFunc = 6;
     AppendPyClass AppendPyClass = 7;
-    AppendArg AppendArg = 8;
-    AppendClassMethodArg AppendClassMethodArg = 9;
-    Invoke Invoke = 10;
-    ReturnResult ReturnResult = 11;
-    RegisterRequest RegisterRequest = 12;
-    DAG DAG = 13;
-    MarkDAGNodeDone MarkDAGNodeDone = 14;
-    RequestObject RequestObject = 15;
-    ResponseObject ResponseObject = 16;
-    AppendUnikernel AppendUnikernel = 17;
+    AppendUnikernel AppendUnikernel = 8;
+    AppendArg AppendArg = 9;
+    AppendClassMethodArg AppendClassMethodArg = 10;
+    Invoke Invoke = 11;
+    ReturnResult ReturnResult = 12;
+    RegisterRequest RegisterRequest = 13;
+    DAG DAG = 14;
+    MarkDAGNodeDone MarkDAGNodeDone = 15;
+    RequestObject RequestObject = 16;
+    ResponseObject ResponseObject = 17;
   }
 }
 

@@ -33,42 +33,32 @@ type Controller struct {
 	deployer task.Deployer
 }
 
-func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
-	ctx.Logger().Info("control: append actor",
-		"name", a.Name,
-		"params", a.Params,
-	)
+// func (c *Controller) onAppendGoActor(ctx actor.Context, a *controller.AppendActor) {
+// 	ctx.Logger().Info("control: append actor",
+// 		"name", a.Name,
+// 		"params", a.Params,
+// 	)
 
-	info := &task.ActorInfo{
-		Ref: a.Ref,
-	}
-	if group, ok := c.groups[a.Name]; ok {
-		group.Push(info)
-		return
-	}
+// 	info := &task.ActorInfo{
+// 		Ref: a.Ref,
+// 	}
+// 	if group, ok := c.groups[a.Name]; ok {
+// 		group.Push(info)
+// 		return
+// 	}
 
-	group := task.NewGroup(a.Name, info)
-	c.groups[a.Name] = group
+// 	group := task.NewGroup(a.Name, info)
+// 	c.groups[a.Name] = group
 
-	node := task.NodeFromActorGroup(a.Name, a.Params, group)
-	c.nodes[a.Name] = node
-}
+// 	node := task.NodeFromActorGroup(a.Name, a.Params, group)
+// 	c.nodes[a.Name] = node
+// }
 
 func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFunc) {
 	ctx.Logger().Info("control: append python function",
 		"name", f.Name,
 		"params", f.Params,
 	)
-
-	// af, err := c.deployer.DeployPyFunc(context.TODO(), c.appID, f)
-
-	// if err != nil {
-	// 	ctx.Logger().Error("control: deploy python function error",
-	// 		"name", f.Name,
-	// 		"err", err,
-	// 	)
-	// 	return
-	// }
 
 	if f.Replicas == 0 {
 		f.Replicas = 1
@@ -83,23 +73,15 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 		return
 	}
 
-	ctx.Logger().Info("2222")
-
 	group := task.NewGroup(f.Name)
 	c.groups[f.Name] = group
-
-	ctx.Logger().Info("33333")
 
 	for _, info := range infos {
 		group.Push(info)
 	}
 
-	ctx.Logger().Info("11111")
-
 	node := task.NodeFromActorGroup(f.Name, f.Params, group)
 	c.nodes[f.Name] = node
-
-	ctx.Logger().Info("44444")
 }
 
 func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData) {

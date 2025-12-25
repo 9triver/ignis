@@ -2,6 +2,7 @@ open Lwt.Infix
 open Websocket
 open Cohttp_mirage
 open Cmdliner
+open Handlers
 
 let connect_id =
   let doc = Arg.info ~doc:"Connection ID of current executor." [ "id" ] in
@@ -233,10 +234,8 @@ module Client
       "executor_id", id
     ] in
     let open Handlers in
-    let store = Store.of_list [
-      "id", Handler.create "id" (fun obj -> Ok obj);
-      "add", Handler.create "add" add;
-    ] in
+    let functions = List.map (fun (a, b) -> a, (Handler.create a b)) handlers in
+    let store = Store.of_list functions in
     WS.connect resolver con uri headers
     >>= fun conn ->
       on_start id conn;
