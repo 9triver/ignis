@@ -3,9 +3,9 @@ package functions
 import (
 	"time"
 
-	"github.com/9triver/ignis/actor/functions/remote"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
+	"github.com/9triver/ignis/transport/ws"
 )
 
 type WSChunk struct {
@@ -17,7 +17,7 @@ type WSChunk struct {
 
 type RemoteFunction struct {
 	FuncDec
-	conn *remote.Connection
+	conn *ws.Connection
 }
 
 func (f *RemoteFunction) Name() string {
@@ -43,7 +43,7 @@ func (f *RemoteFunction) Language() proto.Language {
 }
 
 func NewRemote(
-	manager *remote.Manager,
+	manager *ws.Manager,
 	name string,
 	params []string,
 	connId string,

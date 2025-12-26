@@ -1,4 +1,4 @@
-package remote
+package mirage
 
 import (
 	_ "embed"
@@ -7,23 +7,24 @@ import (
 	"path"
 	"sync"
 
+	"github.com/9triver/ignis/transport/ws"
 	"github.com/9triver/ignis/utils/errors"
 )
 
 var (
-	//go:embed "mirage/build_template.sh"
+	//go:embed "build_template.sh"
 	buildTemplate []byte
 
-	//go:embed "mirage/config.ml"
+	//go:embed "config.ml"
 	configFile []byte
 
-	//go:embed "mirage/unikernel.ml"
+	//go:embed "unikernel.ml"
 	unikernelFile []byte
 )
 
 type Mirage struct {
 	name     string
-	manager  *Manager
+	manager  *ws.Manager
 	handlers string
 	target   string
 }
@@ -122,9 +123,9 @@ func (m *Mirage) Run(connId string) error {
 	}
 }
 
-func NewMirage(
+func New(
 	name string,
-	manager *Manager,
+	manager *ws.Manager,
 	handlers string,
 	target string,
 ) *Mirage {

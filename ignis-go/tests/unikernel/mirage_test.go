@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/9triver/ignis/actor/functions"
-	"github.com/9triver/ignis/actor/functions/remote"
 	"github.com/9triver/ignis/object"
+	"github.com/9triver/ignis/transport/ws"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 )
 
 func TestMirage(t *testing.T) {
-	manager := remote.NewManager("0.0.0.0", 8085)
+	manager := ws.NewManager("0.0.0.0", 8085)
 
 	t.Logf("[go] building unikernel...")
 	f, err := functions.NewUnikernel(manager, "add", []string{"a", "b"}, handlers)

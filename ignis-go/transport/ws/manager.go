@@ -1,4 +1,4 @@
-package remote
+package ws
 
 import (
 	"encoding/json"

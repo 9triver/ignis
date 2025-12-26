@@ -1,50 +1,10 @@
-package utils
+package main
 
 import (
-	"crypto/md5"
 	"encoding/base64"
-	"encoding/hex"
+	"errors"
 	"reflect"
-
-	"github.com/9triver/ignis/utils/errors"
 )
-
-func fieldsOf[T any]() (fields []string) {
-	t := reflect.TypeFor[T]()
-	if t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-
-	if t.Kind() != reflect.Struct {
-		return
-	}
-	for idx := range t.NumField() {
-		fields = append(fields, t.Field(idx).Name)
-	}
-	return
-}
-
-func StructToMap(input any) (m map[string]any, err error) {
-	m = make(map[string]any)
-	t := reflect.TypeOf(input)
-	v := reflect.ValueOf(input)
-	if t.Kind() == reflect.Pointer {
-		t = t.Elem()
-		v = v.Elem()
-	}
-
-	if t.Kind() != reflect.Struct {
-		err = errors.New("input type is not a struct")
-		return
-	}
-
-	for i := range t.NumField() {
-		field := v.Field(i)
-		name := t.Field(i).Name
-		m[name] = field.Interface()
-	}
-	return
-}
 
 type MapHook func(dstType, srcType reflect.Type, v any) (any, error)
 
@@ -148,77 +108,11 @@ func MapToStruct[I any](invoke map[string]any) (ret I, err error) {
 	return input, nil
 }
 
-func _MapToStruct[I any](invoke map[string]any) (ret I, err error) {
-	rv, err := mapToStruct(reflect.TypeFor[I](), invoke)
+func Call(invoke map[string]any) (any, error) {
+	params, err := MapToStruct[*Input](invoke)
 	if err != nil {
-		return
-	}
-	ret, ok := rv.Interface().(I)
-	if !ok {
-		err = errors.New("output type is not an I")
-		return
-	}
-	return
-}
-
-func mapToStruct(t reflect.Type, value any) (ret reflect.Value, err error) {
-	asValue := true
-	if t.Kind() == reflect.Pointer {
-		t = t.Elem()
-		asValue = false
-	}
-	vType := reflect.TypeOf(value)
-	if t.Kind() != reflect.Struct || vType != reflect.TypeFor[map[string]any]() {
-		err = errors.New("map non-struct type")
-		return
+		return nil, err
 	}
 
-	invoke := value.(map[string]any)
-	dst := reflect.New(t)
-	for i := range t.NumField() {
-		field := t.Field(i)
-		v, ok := invoke[field.Name]
-		if !ok {
-			continue
-		}
-
-		fieldValue := dst.Elem().Field(i)
-		fieldType := field.Type
-
-		var rv reflect.Value
-		if fieldType.Kind() == reflect.Struct ||
-			(fieldType.Kind() == reflect.Pointer && fieldType.Elem().Kind() == reflect.Struct) {
-			child, err := mapToStruct(fieldType, v)
-			if err != nil {
-				return ret, err
-			}
-			rv = child
-		} else {
-			rv = reflect.ValueOf(v)
-		}
-
-		if !rv.CanConvert(fieldType) {
-			err = errors.New("invalid type")
-			return
-		}
-
-		if !fieldValue.CanSet() {
-			err = errors.New("cannot set field")
-			return
-		}
-
-		fieldValue.Set(rv.Convert(fieldType))
-	}
-
-	if asValue {
-		dst = dst.Elem()
-	}
-	return dst, nil
-}
-
-func HexMd5Sum(data []byte) string {
-	hasher := md5.New()
-	hasher.Write(data)
-	hashed := hasher.Sum(nil)
-	return hex.EncodeToString(hashed)
+	return Impl(params)
 }

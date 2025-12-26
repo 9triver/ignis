@@ -1,17 +1,18 @@
 package functions
 
 import (
-	"github.com/9triver/ignis/actor/functions/remote"
+	"github.com/9triver/ignis/actor/functions/mirage"
+	"github.com/9triver/ignis/transport/ws"
 	"github.com/9triver/ignis/utils"
 )
 
 func NewUnikernel(
-	manager *remote.Manager,
+	manager *ws.Manager,
 	name string,
 	params []string,
 	handlers string,
 ) (*RemoteFunction, error) {
-	m := remote.NewMirage(name, manager, handlers, "unix")
+	m := mirage.New(name, manager, handlers, "unix")
 	if err := m.Build(); err != nil {
 		return nil, err
 	}
