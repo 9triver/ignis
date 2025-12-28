@@ -649,11 +649,12 @@ func (x *AppendPyClass) GetReplicas() int32 {
 
 type AppendGo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`                              // function name
-	Params        []string               `protobuf:"bytes,2,rep,name=Params,proto3" json:"Params,omitempty"`                          // function params
-	Language      proto.Language         `protobuf:"varint,3,opt,name=Language,proto3,enum=proto.Language" json:"Language,omitempty"` // return type of function
-	Resources     *Resources             `protobuf:"bytes,4,opt,name=Resources,proto3" json:"Resources,omitempty"`                    // resources required by class
-	Replicas      int32                  `protobuf:"varint,5,opt,name=Replicas,proto3" json:"Replicas,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`     // function name
+	Params        []string               `protobuf:"bytes,2,rep,name=Params,proto3" json:"Params,omitempty"` // function params
+	Code          string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	Language      proto.Language         `protobuf:"varint,4,opt,name=Language,proto3,enum=proto.Language" json:"Language,omitempty"` // return type of function
+	Resources     *Resources             `protobuf:"bytes,5,opt,name=Resources,proto3" json:"Resources,omitempty"`                    // resources required by class
+	Replicas      int32                  `protobuf:"varint,6,opt,name=Replicas,proto3" json:"Replicas,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -700,6 +701,13 @@ func (x *AppendGo) GetParams() []string {
 		return x.Params
 	}
 	return nil
+}
+
+func (x *AppendGo) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
 }
 
 func (x *AppendGo) GetLanguage() proto.Language {
@@ -2083,13 +2091,14 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\bReplicas\x18\b \x01(\x05R\bReplicas\x1a9\n" +
 	"\vClassMethod\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x16\n" +
-	"\x06Params\x18\x02 \x03(\tR\x06Params\"\xb4\x01\n" +
+	"\x06Params\x18\x02 \x03(\tR\x06Params\"\xc8\x01\n" +
 	"\bAppendGo\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x16\n" +
-	"\x06Params\x18\x02 \x03(\tR\x06Params\x12+\n" +
-	"\bLanguage\x18\x03 \x01(\x0e2\x0f.proto.LanguageR\bLanguage\x123\n" +
-	"\tResources\x18\x04 \x01(\v2\x15.controller.ResourcesR\tResources\x12\x1a\n" +
-	"\bReplicas\x18\x05 \x01(\x05R\bReplicas\"\xd9\x01\n" +
+	"\x06Params\x18\x02 \x03(\tR\x06Params\x12\x12\n" +
+	"\x04Code\x18\x03 \x01(\tR\x04Code\x12+\n" +
+	"\bLanguage\x18\x04 \x01(\x0e2\x0f.proto.LanguageR\bLanguage\x123\n" +
+	"\tResources\x18\x05 \x01(\v2\x15.controller.ResourcesR\tResources\x12\x1a\n" +
+	"\bReplicas\x18\x06 \x01(\x05R\bReplicas\"\xd9\x01\n" +
 	"\x0fAppendUnikernel\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x16\n" +
 	"\x06Params\x18\x02 \x03(\tR\x06Params\x12\x1c\n" +

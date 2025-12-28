@@ -141,18 +141,20 @@ class AppendPyClass(_message.Message):
     def __init__(self, Name: _Optional[str] = ..., Methods: _Optional[_Iterable[_Union[AppendPyClass.ClassMethod, _Mapping]]] = ..., Venv: _Optional[str] = ..., Requirements: _Optional[_Iterable[str]] = ..., PickledObject: _Optional[bytes] = ..., Language: _Optional[_Union[_platform_pb2.Language, str]] = ..., Resources: _Optional[_Union[Resources, _Mapping]] = ..., Replicas: _Optional[int] = ...) -> None: ...
 
 class AppendGo(_message.Message):
-    __slots__ = ("Name", "Params", "Language", "Resources", "Replicas")
+    __slots__ = ("Name", "Params", "Code", "Language", "Resources", "Replicas")
     NAME_FIELD_NUMBER: _ClassVar[int]
     PARAMS_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
     LANGUAGE_FIELD_NUMBER: _ClassVar[int]
     RESOURCES_FIELD_NUMBER: _ClassVar[int]
     REPLICAS_FIELD_NUMBER: _ClassVar[int]
     Name: str
     Params: _containers.RepeatedScalarFieldContainer[str]
+    Code: str
     Language: _platform_pb2.Language
     Resources: Resources
     Replicas: int
-    def __init__(self, Name: _Optional[str] = ..., Params: _Optional[_Iterable[str]] = ..., Language: _Optional[_Union[_platform_pb2.Language, str]] = ..., Resources: _Optional[_Union[Resources, _Mapping]] = ..., Replicas: _Optional[int] = ...) -> None: ...
+    def __init__(self, Name: _Optional[str] = ..., Params: _Optional[_Iterable[str]] = ..., Code: _Optional[str] = ..., Language: _Optional[_Union[_platform_pb2.Language, str]] = ..., Resources: _Optional[_Union[Resources, _Mapping]] = ..., Replicas: _Optional[int] = ...) -> None: ...
 
 class AppendUnikernel(_message.Message):
     __slots__ = ("Name", "Params", "Unikernel", "Language", "Resources", "Replicas")

@@ -33,26 +33,35 @@ type Controller struct {
 	deployer task.Deployer
 }
 
-// func (c *Controller) onAppendGoActor(ctx actor.Context, a *controller.AppendActor) {
-// 	ctx.Logger().Info("control: append actor",
-// 		"name", a.Name,
-// 		"params", a.Params,
-// 	)
+func (c *Controller) onAppendGo(ctx actor.Context, f *controller.AppendGo) {
+	ctx.Logger().Info("control: append go function",
+		"name", f.Name,
+		"params", f.Params,
+	)
 
-// 	info := &task.ActorInfo{
-// 		Ref: a.Ref,
-// 	}
-// 	if group, ok := c.groups[a.Name]; ok {
-// 		group.Push(info)
-// 		return
-// 	}
+	if f.Replicas == 0 {
+		f.Replicas = 1
+	}
 
-// 	group := task.NewGroup(a.Name, info)
-// 	c.groups[a.Name] = group
+	infos, err := c.deployer.DeployGoFunc(ctx, c.appID, f, c.store)
+	if err != nil {
+		ctx.Logger().Error("control: deploy go function error",
+			"name", f.Name,
+			"err", err,
+		)
+		return
+	}
 
-// 	node := task.NodeFromActorGroup(a.Name, a.Params, group)
-// 	c.nodes[a.Name] = node
-// }
+	group := task.NewGroup(f.Name)
+	c.groups[f.Name] = group
+
+	for _, info := range infos {
+		group.Push(info)
+	}
+
+	node := task.NodeFromActorGroup(f.Name, f.Params, group)
+	c.nodes[f.Name] = node
+}
 
 func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFunc) {
 	ctx.Logger().Info("control: append python function",
@@ -236,6 +245,8 @@ func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controlle
 
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
 	switch cmd := msg.Command.(type) {
+	case *controller.Message_AppendGo:
+		c.onAppendGo(ctx, cmd.AppendGo)
 	case *controller.Message_AppendPyFunc:
 		c.onAppendPyFunc(ctx, cmd.AppendPyFunc)
 	case *controller.Message_AppendData:

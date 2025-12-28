@@ -86,9 +86,10 @@ message AppendPyClass {
 message AppendGo {
   string Name = 1; // function name
   repeated string Params = 2; // function params
-  proto.Language Language = 3; // return type of function
-  Resources Resources = 4; // resources required by class
-  int32 Replicas = 5;
+  string Code = 3;
+  proto.Language Language = 4; // return type of function
+  Resources Resources = 5; // resources required by class
+  int32 Replicas = 6;
 }
 
 message AppendUnikernel {
