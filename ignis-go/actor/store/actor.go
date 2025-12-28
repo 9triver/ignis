@@ -2,22 +2,16 @@
 package store
 
 import (
-	"context"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/configs"
 	"github.com/9triver/ignis/object"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/cluster"
-	iarnetcommonpb "github.com/9triver/ignis/proto/common"
-	iarnetstorepb "github.com/9triver/ignis/proto/resource/store"
 	"github.com/9triver/ignis/utils"
 	"github.com/9triver/ignis/utils/cache"
 	"github.com/9triver/ignis/utils/errors"
@@ -40,9 +34,6 @@ type Actor struct {
 	localObjects  map[string]object.Interface                // 本地对象映射表
 	remoteObjects map[string]utils.Future[object.Interface]  // 远程对象 Future 映射表
 	cache         cache.Controller[string, object.Interface] // 对象缓存管理
-	iarnetClient  iarnetstorepb.ServiceClient                // iarnet store grpc 客户端
-	iarnetConn    *grpc.ClientConn                           // iarnet store grpc 连接
-	iarnetOnce    sync.Once                                  // 用于延迟初始化 iarnet 客户端
 }
 
 // onObjectRequest 处理来自远程 Store 的对象请求
@@ -267,10 +258,13 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 				Error: nil,
 			})
 			return
+		} else {
+			ctx.Send(req.ReplyTo, &ObjectResponse{
+				Value: nil,
+				Error: err,
+			})
+			return
 		}
-		// 本地获取失败，尝试从 iarnet 获取
-		s.requestFromIarnet(ctx, req)
-		return
 	} else {
 		if s.cache != nil {
 			if obj, ok := s.cache.Get(req.Flow.ID); ok {
@@ -306,176 +300,8 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 				s.cache.Insert(flow.ID, obj)
 				return
 			}
-			// 远程获取失败，尝试从 iarnet 获取
-			s.requestFromIarnet(ctx, req)
 		})
 	}
-}
-
-// initIarnetClient 初始化 iarnet store grpc 客户端
-// 从环境变量 IARNET_STORE_ADDR 获取地址
-func (s *Actor) initIarnetClient() error {
-	var err error
-	s.iarnetOnce.Do(func() {
-		addr := os.Getenv("IARNET_STORE_ADDR")
-		if addr == "" {
-			return // 环境变量未设置，不初始化客户端
-		}
-
-		conn, connErr := grpc.NewClient(addr,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(512*1024*1024),
-				grpc.MaxCallSendMsgSize(512*1024*1024),
-			),
-		)
-		if connErr != nil {
-			err = connErr
-			return
-		}
-
-		s.iarnetConn = conn
-		s.iarnetClient = iarnetstorepb.NewServiceClient(conn)
-	})
-	return err
-}
-
-// requestFromIarnet 从 iarnet store 获取对象
-// 参数:
-//   - ctx: Actor 上下文
-//   - req: 请求对象消息
-func (s *Actor) requestFromIarnet(ctx actor.Context, req *RequestObject) {
-	if err := s.initIarnetClient(); err != nil {
-		ctx.Logger().Warn("store: failed to init iarnet client",
-			"id", req.Flow.ID,
-			"error", err,
-		)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
-			Value: nil,
-			Error: errors.WrapWith(err, "store: failed to init iarnet client"),
-		})
-		return
-	}
-
-	if s.iarnetClient == nil {
-		ctx.Logger().Debug("store: iarnet store address not configured",
-			"id", req.Flow.ID,
-		)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
-			Value: nil,
-			Error: errors.Format("store: object %s not found in local or remote stores, and iarnet store not configured", req.Flow.ID),
-		})
-		return
-	}
-
-	ctx.Logger().Info("store: requesting object from iarnet",
-		"id", req.Flow.ID,
-	)
-
-	// 构建请求
-	iarnetReq := &iarnetstorepb.GetObjectRequest{
-		ObjectRef: &iarnetcommonpb.ObjectRef{
-			ID:     req.Flow.ID,
-			Source: req.Flow.Source.ID,
-		},
-	}
-
-	// 调用 iarnet store grpc 服务，使用带超时的 context
-	actxCtx, cancel := context.WithTimeout(context.Background(), configs.FlowTimeout)
-	defer cancel()
-	resp, err := s.iarnetClient.GetObject(actxCtx, iarnetReq)
-	if err != nil {
-		ctx.Logger().Error("store: failed to get object from iarnet",
-			"id", req.Flow.ID,
-			"error", err,
-		)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
-			Value: nil,
-			Error: errors.WrapWith(err, "store: failed to get object %s from iarnet", req.Flow.ID),
-		})
-		return
-	}
-
-	if resp.Object == nil {
-		ctx.Logger().Warn("store: object not found in iarnet",
-			"id", req.Flow.ID,
-		)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
-			Value: nil,
-			Error: errors.Format("store: object %s not found in iarnet", req.Flow.ID),
-		})
-		return
-	}
-
-	// 转换 iarnet 的 EncodedObject 到 ignis 的 EncodedObject
-	ignisObj, err := s.convertIarnetToIgnisObject(resp.Object, req.Flow.ID)
-	if err != nil {
-		ctx.Logger().Error("store: failed to convert iarnet object",
-			"id", req.Flow.ID,
-			"error", err,
-		)
-		ctx.Send(req.ReplyTo, &ObjectResponse{
-			Value: nil,
-			Error: errors.WrapWith(err, "store: failed to convert iarnet object %s", req.Flow.ID),
-		})
-		return
-	}
-
-	ctx.Logger().Info("store: successfully got object from iarnet",
-		"id", req.Flow.ID,
-	)
-
-	ctx.Send(req.ReplyTo, &ObjectResponse{
-		Value: ignisObj,
-		Error: nil,
-	})
-}
-
-// convertIarnetToIgnisObject 将 iarnet 的 EncodedObject 转换为 ignis 的 object.Interface
-// 参数:
-//   - iarnetObj: iarnet 的 EncodedObject
-//   - objectID: 对象 ID
-//
-// 返回值:
-//   - object.Interface: ignis 对象
-//   - error: 转换错误
-func (s *Actor) convertIarnetToIgnisObject(iarnetObj *iarnetcommonpb.EncodedObject, objectID string) (object.Interface, error) {
-	if iarnetObj == nil {
-		return nil, errors.New("iarnet object is nil")
-	}
-
-	// 转换 Language 枚举
-	var ignisLang proto.Language
-	switch iarnetObj.Language {
-	case iarnetcommonpb.Language_LANG_UNKNOWN:
-		ignisLang = proto.Language_LANG_UNKNOWN
-	case iarnetcommonpb.Language_LANG_JSON:
-		ignisLang = proto.Language_LANG_JSON
-	case iarnetcommonpb.Language_LANG_GO:
-		ignisLang = proto.Language_LANG_GO
-	case iarnetcommonpb.Language_LANG_PYTHON:
-		ignisLang = proto.Language_LANG_PYTHON
-	default:
-		return nil, errors.Format("unsupported language: %v", iarnetObj.Language)
-	}
-
-	// 如果是流对象，创建 Stream
-	if iarnetObj.IsStream {
-		stream := object.StreamWithID(objectID, nil, ignisLang)
-		return stream, nil
-	}
-
-	// 创建 ignis 的 EncodedObject (Remote)
-	ignisObj := &proto.EncodedObject{
-		ID:       objectID,
-		Data:     iarnetObj.Data,
-		Language: ignisLang,
-		Stream:   false,
-		Source:   s.ref, // 设置为当前 store
-	}
-
-	// proto.EncodedObject 实现了 object.Interface，可以直接返回
-	return ignisObj, nil
 }
 
 // onForward 处理需要转发的消息
@@ -523,10 +349,6 @@ func (s *Actor) Receive(ctx actor.Context) {
 	case ForwardMessage:
 		s.onForward(ctx, msg)
 	// cleanup on stop
-	case *actor.Stop:
-		if s.iarnetConn != nil {
-			s.iarnetConn.Close()
-		}
 	default:
 		ctx.Logger().Warn("store: unknown message type", "store", s.id, "type", msg)
 	}
