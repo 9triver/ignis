@@ -11,12 +11,8 @@ import (
 
 	"github.com/9triver/ignis/actor/functions/python"
 	"github.com/9triver/ignis/actor/store"
-<<<<<<< HEAD
 	"github.com/9triver/ignis/monitor"
-	"github.com/9triver/ignis/objects"
-=======
 	"github.com/9triver/ignis/object"
->>>>>>> master
 	"github.com/9triver/ignis/platform/task"
 	"github.com/9triver/ignis/proto"
 	"github.com/9triver/ignis/proto/controller"
@@ -203,27 +199,6 @@ func (c *Controller) onInvoke(ctx actor.Context, invoke *controller.Invoke) {
 	rt.Start(ctx)
 }
 
-<<<<<<< HEAD
-func (c *Controller) onDAG(ctx actor.Context, dag *controller.DAG) {
-	ctx.Logger().Info("control: append DAG",
-		"node num", len(dag.Nodes),
-	)
-	_ = c.monitor.SetApplicationDAG(c.ctx, c.appID, dag)
-}
-
-func (c *Controller) onMarkDAGNodeDone(ctx actor.Context, markDone *controller.MarkDAGNodeDone) {
-	ctx.Logger().Info("control: mark DAG node done",
-		"nodeID", markDone.NodeId,
-	)
-
-	// Update the application info with the node completion
-	_ = c.monitor.MarkNodeDone(c.ctx, c.appID, markDone.NodeId, &monitor.NodeResult{
-		Success: true,
-	})
-}
-
-=======
->>>>>>> master
 func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controller.RequestObject) {
 	ctx.Logger().Info("control: request object",
 		"id", requestObject.ID,
@@ -379,11 +354,7 @@ func SpawnTaskController(
 
 // For iarnet
 func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.Deployer,
-<<<<<<< HEAD
-	mon monitor.Monitor, appCtx context.Context, c remote.Controller, onClose func()) *proto.ActorRef {
-=======
-	appInfo ApplicationInfo, c transport.Controller, onClose func()) *proto.ActorRef {
->>>>>>> master
+	c transport.Controller, onClose func()) *proto.ActorRef {
 
 	store := store.Spawn(ctx, nil, "store-"+appID)
 
@@ -393,8 +364,7 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 			id:         controllerId,
 			controller: c,
 			appID:      appID,
-			monitor:    mon,
-			ctx:        appCtx,
+			ctx:        context.Background(),
 			deployer:   deployer,
 			store:      store,
 			nodes:      make(map[string]*task.Node),

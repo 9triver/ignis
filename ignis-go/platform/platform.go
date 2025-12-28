@@ -5,7 +5,6 @@ package platform
 import (
 	"context"
 	"path"
-	"sync"
 
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/sirupsen/logrus"
@@ -95,10 +94,8 @@ func (p *Platform) handleClientConnections(ctx context.Context) {
 		logrus.Info("New client is connected, starting controller...")
 		// 为每个连接生成唯一的 session ID
 		sessionID := utils.GenIDWith("session-")
-		appInfo := NewApplicationInfo(sessionID)
 
-		// 直接启动 controller，不需要等待注册请求
-		control.SpawnTaskControllerV2(p.sys.Root, sessionID, p.dp, appInfo, ctrlr, func() {
+		control.SpawnTaskControllerV2(p.sys.Root, sessionID, p.dp, ctrlr, func() {
 			logrus.Infof("Controller for session %s is closed", sessionID)
 		})
 
@@ -141,23 +138,5 @@ func NewPlatform(ctx context.Context, rpcAddr string, dp task.Deployer) *Platfor
 		cm:  rpc.NewManager(rpcAddr),
 		em:  em,
 		dp:  dp,
-	}
-}
-
-// ApplicationInfo 存储应用的信息和状态
-type ApplicationInfo struct {
-	ID    string       // 应用 ID
-	mutex sync.RWMutex // 保护并发访问的读写锁
-}
-
-// NewApplicationInfo 创建一个新的应用信息实例
-// 参数:
-//   - appID: 应用标识符
-//
-// 返回值:
-//   - *ApplicationInfo: 应用信息实例
-func NewApplicationInfo(appID string) *ApplicationInfo {
-	return &ApplicationInfo{
-		ID: appID,
 	}
 }
