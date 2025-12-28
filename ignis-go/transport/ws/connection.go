@@ -1,4 +1,4 @@
-package remote
+package ws
 
 import (
 	"encoding/json"
@@ -37,7 +37,11 @@ func (m *Connection) handlerMessage(data []byte) error {
 		return errors.New("no such future")
 	}
 
-	fut.Resolve(object.NewLocal(msg.Value, object.LangJson))
+	if msg.Error != "" {
+		fut.Reject(errors.New(msg.Error))
+	} else {
+		fut.Resolve(object.NewLocal(msg.Value, object.LangJson))
+	}
 	return nil
 }
 

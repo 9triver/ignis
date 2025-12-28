@@ -40,25 +40,34 @@ type Controller struct {
 	deployer task.Deployer
 }
 
-func (c *Controller) onAppendActor(ctx actor.Context, a *controller.AppendActor) {
-	ctx.Logger().Info("control: append actor",
-		"name", a.Name,
-		"params", a.Params,
+func (c *Controller) onAppendGo(ctx actor.Context, f *controller.AppendGo) {
+	ctx.Logger().Info("control: append go function",
+		"name", f.Name,
+		"params", f.Params,
 	)
 
-	info := &task.ActorInfo{
-		Ref: a.Ref,
+	if f.Replicas == 0 {
+		f.Replicas = 1
 	}
-	if group, ok := c.groups[a.Name]; ok {
-		group.Push(info)
+
+	infos, err := c.deployer.DeployGoFunc(ctx, c.appID, f, c.store)
+	if err != nil {
+		ctx.Logger().Error("control: deploy go function error",
+			"name", f.Name,
+			"err", err,
+		)
 		return
 	}
 
-	group := task.NewGroup(a.Name, info)
-	c.groups[a.Name] = group
+	group := task.NewGroup(f.Name)
+	c.groups[f.Name] = group
 
-	node := task.NodeFromActorGroup(a.Name, a.Params, group)
-	c.nodes[a.Name] = node
+	for _, info := range infos {
+		group.Push(info)
+	}
+
+	node := task.NodeFromActorGroup(f.Name, f.Params, group)
+	c.nodes[f.Name] = node
 }
 
 func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFunc) {
@@ -66,16 +75,6 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 		"name", f.Name,
 		"params", f.Params,
 	)
-
-	// af, err := c.deployer.DeployPyFunc(context.TODO(), c.appID, f)
-
-	// if err != nil {
-	// 	ctx.Logger().Error("control: deploy python function error",
-	// 		"name", f.Name,
-	// 		"err", err,
-	// 	)
-	// 	return
-	// }
 
 	if f.Replicas == 0 {
 		f.Replicas = 1
@@ -90,23 +89,15 @@ func (c *Controller) onAppendPyFunc(ctx actor.Context, f *controller.AppendPyFun
 		return
 	}
 
-	ctx.Logger().Info("2222")
-
 	group := task.NewGroup(f.Name)
 	c.groups[f.Name] = group
-
-	ctx.Logger().Info("33333")
 
 	for _, info := range infos {
 		group.Push(info)
 	}
 
-	ctx.Logger().Info("11111")
-
 	node := task.NodeFromActorGroup(f.Name, f.Params, group)
 	c.nodes[f.Name] = node
-
-	ctx.Logger().Info("44444")
 }
 
 func (c *Controller) onAppendData(ctx actor.Context, data *controller.AppendData) {
@@ -266,6 +257,8 @@ func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controlle
 
 func (c *Controller) onControllerMessage(ctx actor.Context, msg *controller.Message) {
 	switch cmd := msg.Command.(type) {
+	case *controller.Message_AppendGo:
+		c.onAppendGo(ctx, cmd.AppendGo)
 	case *controller.Message_AppendPyFunc:
 		c.onAppendPyFunc(ctx, cmd.AppendPyFunc)
 	case *controller.Message_AppendData:

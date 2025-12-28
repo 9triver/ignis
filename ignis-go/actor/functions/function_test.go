@@ -1,12 +1,39 @@
 package functions
 
 import (
+	_ "embed"
 	"testing"
 
-	"github.com/9triver/ignis/actor/functions/remote"
 	"github.com/9triver/ignis/object"
+	"github.com/9triver/ignis/transport/ws"
 	"github.com/9triver/ignis/utils/errors"
 )
+
+func TestGoFunc(t *testing.T) {
+	type I struct {
+		A int
+		B int
+	}
+
+	type O = int
+
+	innerFunc := func(input *I) (O, error) {
+		return input.A + input.B, nil
+	}
+
+	f := NewGo("sum", innerFunc, object.LangGo)
+	invoke := map[string]object.Interface{
+		"A": object.NewLocal(10, object.LangGo),
+		"B": object.NewLocal(10, object.LangGo),
+	}
+
+	ret, err := f.Call(invoke)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(ret.Value())
+}
 
 func TestStreamJoinFunc(t *testing.T) {
 	type I struct {
@@ -99,7 +126,7 @@ func TestStreamStreamFunc(t *testing.T) {
 }
 
 func TestRemote(t *testing.T) {
-	manager := remote.NewManager("0.0.0.0", 8085)
+	manager := ws.NewManager("0.0.0.0", 8085)
 	f := NewRemote(manager, "add", []string{"a", "b"}, "unikernel")
 	obj, err := f.Call(map[string]object.Interface{
 		"a": object.NewLocal(10, object.LangJson),
@@ -111,4 +138,26 @@ func TestRemote(t *testing.T) {
 	}
 
 	t.Log(obj, 111)
+}
+
+//go:embed "go_plugin.go.in"
+var codePlugin string
+
+func TestGoPlugin(t *testing.T) {
+	f, err := ImplGo("add", []string{"A", "B"}, codePlugin, object.LangGo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	inputs := map[string]object.Interface{
+		"A": object.NewLocal(20, object.LangGo),
+		"B": object.NewLocal(20, object.LangGo),
+	}
+
+	r, err := f.Call(inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(r.Value())
 }

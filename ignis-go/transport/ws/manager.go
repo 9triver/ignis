@@ -1,4 +1,4 @@
-package remote
+package ws
 
 import (
 	"encoding/json"
@@ -85,6 +85,17 @@ func (m *Manager) GetConnection(connId string) *Connection {
 	m.mu.Unlock()
 
 	return <-m.connections[connId]
+}
+
+func (m *Manager) Endpoint() string {
+	var host string
+	if m.host == "0.0.0.0" {
+		host = "127.0.0.1"
+	} else {
+		host = m.host
+	}
+
+	return fmt.Sprintf("http://%s:%d/ws", host, m.port)
 }
 
 func (m *Manager) Run() error {

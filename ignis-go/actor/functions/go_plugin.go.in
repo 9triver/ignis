@@ -1,0 +1,12 @@
+package main
+
+type Input struct {
+  A int
+  B int
+}
+
+type Output = int
+
+func Impl(input *Input) (Output, error) {
+  return input.A + input.B, nil
+}

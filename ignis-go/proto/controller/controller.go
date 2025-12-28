@@ -46,14 +46,14 @@ func NewAppendPyFunc(name string, params []string, venv string, requirements []s
 	return NewMessage(cmd)
 }
 
-func NewAppendActor(name string, params []string, ref *proto.ActorRef) *Message {
-	cmd := &AppendActor{
-		Name:   name,
-		Params: params,
-		Ref:    ref,
-	}
-	return NewMessage(cmd)
-}
+// func NewAppendActor(name string, params []string, ref *proto.ActorRef) *Message {
+// 	cmd := &AppendActor{
+// 		Name:   name,
+// 		Params: params,
+// 		Ref:    ref,
+// 	}
+// 	return NewMessage(cmd)
+// }
 
 func NewAppendArg(sessionId, instanceId, name, param string, flow *proto.Flow, encoded *proto.EncodedObject) *Message {
 	data := &Data{}
@@ -113,9 +113,9 @@ func NewMessage(cmd pb.Message) *Message {
 	case *AppendData:
 		ret.Type = CommandType_FR_APPEND_DATA
 		ret.Command = &Message_AppendData{AppendData: cmd}
-	case *AppendActor:
-		ret.Type = CommandType_FR_APPEND_ACTOR
-		ret.Command = &Message_AppendActor{AppendActor: cmd}
+	// case *AppendActor:
+	// 	ret.Type = CommandType_FR_APPEND_ACTOR
+	// 	ret.Command = &Message_AppendActor{AppendActor: cmd}
 	case *AppendPyFunc:
 		ret.Type = CommandType_FR_APPEND_PY_FUNC
 		ret.Command = &Message_AppendPyFunc{AppendPyFunc: cmd}

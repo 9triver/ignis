@@ -1,14 +1,23 @@
 package router
 
 import (
+	"fmt"
+
 	"github.com/9triver/ignis/proto"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
+	"google.golang.org/grpc"
 )
 
 type TCPRouter struct {
 	baseRouter
+	remoter             *remote.Remote
 	bootstrap, listener *actor.PID
+}
+
+func (r *TCPRouter) Send(targetId string, msg any) {
+	fmt.Printf("sending to %s via TCP\n", targetId)
+	r.baseRouter.Send(targetId, msg)
 }
 
 func (r *TCPRouter) Register(store *proto.StoreRef) {
@@ -17,13 +26,22 @@ func (r *TCPRouter) Register(store *proto.StoreRef) {
 	r.ctx.Send(r.bootstrap, store)
 }
 
+func (r *TCPRouter) Shutdown() {
+	r.remoter.Shutdown(true)
+}
+
 func NewTCPRouter(ctx Context, bootstrap *actor.PID, host string, port int) *TCPRouter {
 	router := &TCPRouter{
 		baseRouter: makeBaseRouter(ctx),
 	}
 
-	remoter := remote.NewRemote(ctx.ActorSystem(), remote.Configure(host, port))
+	serverOpts := remote.WithServerOptions(
+		grpc.MaxRecvMsgSize(512*1024*1024),
+		grpc.MaxSendMsgSize(512*1024*1024),
+	)
 
+	remoter := remote.NewRemote(ctx.ActorSystem(), remote.Configure(host, port, serverOpts))
+	router.remoter = remoter
 	remoter.Start()
 
 	props := actor.PropsFromFunc(func(c actor.Context) {

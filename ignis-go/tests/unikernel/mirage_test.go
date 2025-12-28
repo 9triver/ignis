@@ -1,0 +1,38 @@
+package unikernel
+
+import (
+	_ "embed"
+	"testing"
+
+	"github.com/9triver/ignis/actor/functions"
+	"github.com/9triver/ignis/object"
+	"github.com/9triver/ignis/transport/ws"
+)
+
+var (
+	//go:embed "handlers.ml"
+	handlers string
+)
+
+func TestMirage(t *testing.T) {
+	manager := ws.NewManager("0.0.0.0", 8085)
+
+	t.Logf("[go] building unikernel...")
+	f, err := functions.NewUnikernel(manager, "add", []string{"a", "b"}, handlers)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("[go] calling unikernel...")
+	obj, err := f.Call(map[string]object.Interface{
+		"a": object.NewLocal(10, object.LangJson),
+		"b": object.NewLocal(20, object.LangJson),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v, _ := obj.Value()
+	t.Logf("[go] receive call result %s: %v", obj.GetID(), v)
+}

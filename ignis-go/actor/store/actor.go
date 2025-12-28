@@ -19,6 +19,7 @@ import (
 	iarnetcommonpb "github.com/9triver/ignis/proto/common"
 	iarnetstorepb "github.com/9triver/ignis/proto/resource/store"
 	"github.com/9triver/ignis/utils"
+	"github.com/9triver/ignis/utils/cache"
 	"github.com/9triver/ignis/utils/errors"
 )
 
@@ -32,14 +33,16 @@ import (
 //   - 通过路由器与其他 Store Actor 通信
 //   - 当无法从本地或远程获取时，可以从 iarnet store 获取
 type Actor struct {
-	id            string                                    // Store 标识符
-	ref           *proto.StoreRef                           // Store 引用（包含 ID 和 PID）
-	router        router.Router                             // 传输存根（用于远程通信）
-	localObjects  map[string]object.Interface               // 本地对象映射表
-	remoteObjects map[string]utils.Future[object.Interface] // 远程对象 Future 映射表
-	iarnetClient  iarnetstorepb.ServiceClient               // iarnet store grpc 客户端
-	iarnetConn    *grpc.ClientConn                          // iarnet store grpc 连接
-	iarnetOnce    sync.Once                                 // 用于延迟初始化 iarnet 客户端
+	mu            sync.RWMutex
+	id            string                                     // Store 标识符
+	ref           *proto.StoreRef                            // Store 引用（包含 ID 和 PID）
+	router        router.Router                              // 传输存根（用于远程通信）
+	localObjects  map[string]object.Interface                // 本地对象映射表
+	remoteObjects map[string]utils.Future[object.Interface]  // 远程对象 Future 映射表
+	cache         cache.Controller[string, object.Interface] // 对象缓存管理
+	iarnetClient  iarnetstorepb.ServiceClient                // iarnet store grpc 客户端
+	iarnetConn    *grpc.ClientConn                           // iarnet store grpc 连接
+	iarnetOnce    sync.Once                                  // 用于延迟初始化 iarnet 客户端
 }
 
 // onObjectRequest 处理来自远程 Store 的对象请求
@@ -110,6 +113,9 @@ func (s *Actor) onObjectResponse(ctx actor.Context, resp *cluster.ObjectResponse
 		return
 	}
 
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	ctx.Logger().Info("store: receive object response",
 		"id", resp.ID,
 	)
@@ -144,6 +150,9 @@ func (s *Actor) onStreamChunk(ctx actor.Context, chunk *proto.StreamChunk) {
 		"stream", chunk.StreamID,
 		"isEos", chunk.EoS,
 	)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	fut, ok := s.remoteObjects[chunk.StreamID]
 	if !ok {
 		return
@@ -216,6 +225,9 @@ func (s *Actor) getLocalObject(flow *proto.Flow) (object.Interface, error) {
 //  3. 通过路由器发送请求到远程 Store
 //  4. 返回 Future 供调用者等待结果
 func (s *Actor) requestRemoteObject(ctx actor.Context, flow *proto.Flow) utils.Future[object.Interface] {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	if fut, ok := s.remoteObjects[flow.ID]; ok {
 		return fut
 	}
@@ -223,9 +235,7 @@ func (s *Actor) requestRemoteObject(ctx actor.Context, flow *proto.Flow) utils.F
 	fut := utils.NewFuture[object.Interface](configs.FlowTimeout)
 	s.remoteObjects[flow.ID] = fut
 
-	remoteRef := flow.Source
-
-	s.router.Send(remoteRef.ID, &cluster.ObjectRequest{
+	s.router.Send(flow.Source.ID, &cluster.ObjectRequest{
 		ID:      flow.ID,
 		Target:  flow.Source.ID,
 		ReplyTo: s.id,
@@ -261,20 +271,45 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 		// 本地获取失败，尝试从 iarnet 获取
 		s.requestFromIarnet(ctx, req)
 		return
-	}
-
-	// 尝试从远程 Store 获取
-	s.requestRemoteObject(ctx, req.Flow).OnDone(func(obj object.Interface, duration time.Duration, err error) {
-		if err == nil && obj != nil {
-			ctx.Send(req.ReplyTo, &ObjectResponse{
-				Value: obj,
-				Error: nil,
-			})
-			return
+	} else {
+		if s.cache != nil {
+			if obj, ok := s.cache.Get(req.Flow.ID); ok {
+				ctx.Logger().Info("store: loaded from cache", "obj", req.Flow.ID)
+				ctx.Send(req.ReplyTo, &ObjectResponse{
+					Value: obj,
+				})
+				return
+			}
 		}
-		// 远程获取失败，尝试从 iarnet 获取
-		s.requestFromIarnet(ctx, req)
-	})
+
+		flow := req.Flow
+		// 尝试从远程 Store 获取对象
+		s.requestRemoteObject(ctx, flow).OnDone(func(obj object.Interface, duration time.Duration, err error) {
+			if err == nil && obj != nil {
+				ctx.Send(req.ReplyTo, &ObjectResponse{
+					Value: obj,
+					Error: nil,
+				})
+				if _, ok := obj.(*object.Stream); ok {
+					return
+				}
+
+				s.mu.RLock()
+				defer s.mu.RUnlock()
+				delete(s.remoteObjects, flow.ID)
+
+				if s.cache == nil || err != nil {
+					return
+				}
+
+				ctx.Logger().Info("store: insert remote cache", "object", flow.ID)
+				s.cache.Insert(flow.ID, obj)
+				return
+			}
+			// 远程获取失败，尝试从 iarnet 获取
+			s.requestFromIarnet(ctx, req)
+		})
+	}
 }
 
 // initIarnetClient 初始化 iarnet store grpc 客户端
@@ -346,7 +381,7 @@ func (s *Actor) requestFromIarnet(ctx actor.Context, req *RequestObject) {
 	}
 
 	// 调用 iarnet store grpc 服务，使用带超时的 context
-	actxCtx, cancel := context.WithTimeout(ctx.ActorSystem().Root.Context(), configs.FlowTimeout)
+	actxCtx, cancel := context.WithTimeout(context.Background(), configs.FlowTimeout)
 	defer cancel()
 	resp, err := s.iarnetClient.GetObject(actxCtx, iarnetReq)
 	if err != nil {
@@ -450,13 +485,6 @@ func (s *Actor) convertIarnetToIgnisObject(iarnetObj *iarnetcommonpb.EncodedObje
 //
 // 该方法通过路由器将消息转发到目标 Actor
 func (s *Actor) onForward(ctx actor.Context, forward ForwardMessage) {
-	// target := forward.GetTarget()
-	// if target.Store.ID == s.ref.ID { // target is local
-	// 	ctx.Send(target.PID, forward)
-	// } else {
-	// 	ctx.Logger().Info("store: forwarding request")
-	// 	s.stub.SendTo(target.Store, forward)
-	// }
 	ctx.Logger().Info("store: forwarding request",
 		"target", forward.GetTarget(),
 		"msg", forward,
@@ -519,6 +547,7 @@ func New(router router.Router, id string) *actor.Props {
 		router:        router,
 		localObjects:  make(map[string]object.Interface),
 		remoteObjects: make(map[string]utils.Future[object.Interface]),
+		cache:         cache.NewLRU[string, object.Interface](32),
 	}
 	return actor.PropsFromProducer(func() actor.Actor {
 		return s
@@ -541,13 +570,22 @@ func New(router router.Router, id string) *actor.Props {
 //  2. 使用指定 ID 启动 Actor
 //  3. 在路由器中注册 Store
 //  4. 返回 Store 引用供其他组件使用
-func Spawn(ctx *actor.RootContext, router router.Router, id string) *proto.StoreRef {
+func Spawn(
+	ctx *actor.RootContext,
+	router router.Router,
+	id string,
+	cache ...cache.Controller[string, object.Interface],
+) *proto.StoreRef {
 	s := &Actor{
 		id:            id,
 		router:        router,
 		localObjects:  make(map[string]object.Interface),
 		remoteObjects: make(map[string]utils.Future[object.Interface]),
 	}
+	if len(cache) > 0 {
+		s.cache = cache[0]
+	}
+
 	props := actor.PropsFromProducer(func() actor.Actor {
 		return s
 	})
@@ -612,15 +650,15 @@ func GetObject(ctx actor.Context, store *actor.PID, flow *proto.Flow) utils.Futu
 		}
 	})
 
-	flowActor, err := ctx.SpawnNamed(props, "flow."+flow.ID)
-	if err != nil {
-		ctx.Logger().Error("store: flow spawn failed",
-			"id", flow.ID,
-			"error", err,
-		)
-		fut.Reject(errors.WrapWith(err, "flow %s spawn failed", flow.ID))
-		return fut
-	}
+	flowActor := ctx.Spawn(props)
+	// if err != nil {
+	// 	ctx.Logger().Error("store: flow spawn failed",
+	// 		"id", flow.ID,
+	// 		"error", err,
+	// 	)
+	// 	fut.Reject(errors.WrapWith(err, "flow %s spawn failed", flow.ID))
+	// 	return fut
+	// }
 	ctx.Send(store, &RequestObject{
 		ReplyTo: flowActor,
 		Flow:    flow,

@@ -138,6 +138,14 @@ func (s *Stream) ToChan() <-chan Interface {
 	return ch
 }
 
+func (s *Stream) IsStream() bool {
+	return true
+}
+
+func (s *Stream) Completed() bool {
+	return s.completed
+}
+
 // NewStream 创建一个新的流对象，自动生成唯一 ID
 // 参数:
 //   - values: 数据源（可以是 channel 或 nil）

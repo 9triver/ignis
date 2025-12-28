@@ -99,7 +99,7 @@ func NewSTUNRouter(ctx Context, source, signalingServer string) *STUNRouter {
 		router.handleEnvelope(envelope)
 	}
 
-	sender := stun.NewNatSender(source, signalingServer, onMessage, logging.LogLevelWarn)
+	sender := stun.NewNatSender(source, signalingServer, onMessage, logging.LogLevelError)
 
 	sender.Listen(nil)
 	go func() {

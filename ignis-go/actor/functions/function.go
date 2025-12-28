@@ -19,7 +19,7 @@ type Function interface {
 }
 
 var (
-	_ Function = (*GoFunction[any, any])(nil)
+	_ Function = (*GoFunction)(nil)
 	_ Function = (*PyFunction)(nil)
 	_ Function = (*RemoteFunction)(nil)
 )
@@ -40,6 +40,10 @@ func (f FuncDec) Params() []string {
 func DeclareTyped[T, R any](name string) FuncDec {
 	var tmp T
 	t := reflect.TypeOf(tmp)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+
 	params := make([]string, 0, t.NumField())
 	for i := range t.NumField() {
 		params = append(params, t.Field(i).Name)
