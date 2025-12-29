@@ -26,6 +26,7 @@ type Controller struct {
 	manager    *python.VenvManager
 	controller transport.Controller
 	store      *proto.StoreRef
+	router     router.Router // 添加 router 引用
 	appID      string
 	monitor    monitor.Monitor
 	ctx        context.Context
@@ -61,6 +62,11 @@ func (c *Controller) onAppendGo(ctx actor.Context, f *controller.AppendGo) {
 
 	for _, info := range infos {
 		group.Push(info)
+		// 将 compute actor 注册到 router
+		if c.router != nil {
+			c.router.RegisterActor(info.Ref.ID, info.Ref.PID)
+			ctx.Logger().Info("control: registered compute actor to router", "id", info.Ref.ID, "pid", info.Ref.PID)
+		}
 	}
 
 	node := task.NodeFromActorGroup(f.Name, f.Params, group)
@@ -197,7 +203,27 @@ func (c *Controller) onInvoke(ctx actor.Context, invoke *controller.Invoke) {
 		return
 	}
 
-	rt.Start(ctx)
+	ctx.Logger().Info("control: calling rt.Start",
+		"name", invoke.Name,
+		"session", invoke.SessionID,
+		"instance", invoke.InstanceID,
+	)
+	if err := rt.Start(ctx); err != nil {
+		ctx.Logger().Error("control: rt.Start error",
+			"name", invoke.Name,
+			"session", invoke.SessionID,
+			"instance", invoke.InstanceID,
+			"err", err,
+		)
+		msg := controller.NewReturnResult(invoke.SessionID, invoke.InstanceID, invoke.Name, nil, err)
+		c.controller.SendChan() <- msg
+	} else {
+		ctx.Logger().Info("control: rt.Start completed successfully",
+			"name", invoke.Name,
+			"session", invoke.SessionID,
+			"instance", invoke.InstanceID,
+		)
+	}
 }
 
 func (c *Controller) onRequestObject(ctx actor.Context, requestObject *controller.RequestObject) {
@@ -366,6 +392,7 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 		return &Controller{
 			id:         controllerId,
 			controller: c,
+			router:     r, // 传递 router 引用
 			appID:      appID,
 			ctx:        context.Background(),
 			deployer:   deployer,
@@ -378,6 +405,10 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 
 	pid, _ := ctx.SpawnNamed(props, controllerId)
 	logrus.Infof("control: spawn controller %s with pid %s", controllerId, pid)
+
+	// 将 controller 注册到 router
+	r.RegisterActor(controllerId, pid)
+	logrus.Infof("control: registered controller %s to router", controllerId)
 
 	go func() {
 		defer onClose()

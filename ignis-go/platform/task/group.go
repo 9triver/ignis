@@ -78,10 +78,20 @@ func (h *GroupedTaskHandler) Start(ctx actor.Context, replyTo string) error {
 
 func (h *GroupedTaskHandler) Invoke(ctx actor.Context, param string, value *proto.Flow) (bool, error) {
 	if h.selected == nil {
+		ctx.Logger().Info("task: selecting actor from group", "session", h.sessionId, "param", param)
 		h.selected = h.group.Select()
+		ctx.Logger().Info("task: selected actor", "session", h.sessionId, "actor_id", h.selected.Ref.ID, "actor_pid", h.selected.Ref.PID)
 	}
 
 	h.deps.Remove(param)
+	ctx.Logger().Info("task: sending Invoke to store for grouped task",
+		"session", h.sessionId,
+		"param", param,
+		"target", h.selected.Ref.ID,
+		"target_pid", h.selected.Ref.PID,
+		"value_id", value.ID,
+		"deps_remaining", h.deps.Len(),
+		"ready", h.Ready())
 	ctx.Send(h.store, &proto.Invoke{
 		Target:    h.selected.Ref.ID,
 		SessionID: h.sessionId,

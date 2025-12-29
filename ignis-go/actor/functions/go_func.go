@@ -35,6 +35,10 @@ func (f *GoFunction) Call(params map[string]object.Interface) (object.Interface,
 		invoke[k] = value
 	}
 
+	// 添加日志以便调试
+	// 注意：这里没有 context，所以不能使用 ctx.Logger()
+	// 但可以通过其他方式记录日志，或者让调用者记录
+
 	o, err := f.impl(invoke)
 	if err != nil {
 		return nil, errors.WrapWith(err, "call: execution failed")

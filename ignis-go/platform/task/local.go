@@ -19,31 +19,43 @@ type LocalTaskHandler struct {
 
 func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
 	if !h.Ready() {
+		ctx.Logger().Error("task: LocalTaskHandler not ready", "session", h.sessionId)
 		return errors.New("not ready")
 	}
 
+	ctx.Logger().Info("task: LocalTaskHandler.Start", "session", h.sessionId, "params_count", len(h.params), "replyTo", replyTo)
+
 	futures := make(map[string]utils.Future[object.Interface])
 	for param, flow := range h.params {
+		ctx.Logger().Debug("task: fetching object for param", "session", h.sessionId, "param", param, "flow_id", flow.ID)
 		futures[param] = store.GetObject(ctx, h.store, flow)
 	}
 
 	invoke := make(map[string]object.Interface)
 	for param, fut := range futures {
+		ctx.Logger().Debug("task: waiting for object result", "session", h.sessionId, "param", param)
 		obj, err := fut.Result()
 		if err != nil {
+			ctx.Logger().Error("task: failed to get object for param", "session", h.sessionId, "param", param, "err", err)
 			return err
 		}
+		ctx.Logger().Debug("task: got object for param", "session", h.sessionId, "param", param)
 		invoke[param] = obj
 	}
 
+	ctx.Logger().Info("task: calling function", "session", h.sessionId, "function", h.localFunc.Name(), "params", len(invoke))
 	obj, err := h.localFunc.Call(invoke)
 	if err != nil {
+		ctx.Logger().Error("task: function call failed", "session", h.sessionId, "function", h.localFunc.Name(), "err", err)
 		return err
 	}
+	ctx.Logger().Info("task: function call succeeded", "session", h.sessionId, "function", h.localFunc.Name())
 
+	ctx.Logger().Debug("task: saving result object", "session", h.sessionId)
 	ctx.Send(h.store, &store.SaveObject{
 		Value: obj,
 		Callback: func(ctx actor.Context, ref *proto.Flow) {
+			ctx.Logger().Info("task: result object saved, sending InvokeResponse", "session", h.sessionId, "result_id", ref.ID)
 			ctx.Send(h.store, &proto.InvokeResponse{
 				Target:    replyTo,
 				SessionID: h.sessionId,
@@ -52,6 +64,7 @@ func (h *LocalTaskHandler) Start(ctx actor.Context, replyTo string) error {
 		},
 	})
 
+	ctx.Logger().Info("task: LocalTaskHandler.Start completed", "session", h.sessionId)
 	return nil
 }
 

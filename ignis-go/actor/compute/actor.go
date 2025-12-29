@@ -27,6 +27,7 @@ func (a *Actor) newSession(ctx actor.Context, sessionId string) *actor.PID {
 }
 
 func (a *Actor) onInvokeStart(ctx actor.Context, start *proto.InvokeStart) {
+	ctx.Logger().Info("compute: receive InvokeStart", "actor", a.name, "session", start.SessionID, "replyTo", start.ReplyTo)
 	session, ok := a.sessions[start.SessionID]
 	if !ok {
 		session = a.newSession(ctx, start.SessionID)
@@ -36,6 +37,7 @@ func (a *Actor) onInvokeStart(ctx actor.Context, start *proto.InvokeStart) {
 		Info:    start.Info,
 		ReplyTo: start.ReplyTo,
 	})
+	ctx.Logger().Info("compute: sent SessionStart to session", "actor", a.name, "session", start.SessionID)
 }
 
 func (a *Actor) onInvoke(ctx actor.Context, invoke *proto.Invoke) {

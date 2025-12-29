@@ -19,6 +19,7 @@ type Context interface {
 type Router interface {
 	Send(targetId string, msg any)
 	Register(store *proto.StoreRef)
+	RegisterActor(targetId string, pid *actor.PID) // 注册普通的 actor
 	Deregister(targetId string)
 	Shutdown()
 }
@@ -47,6 +48,16 @@ func (r *baseRouter) Register(store *proto.StoreRef) {
 	defer r.mu.Unlock()
 
 	r.routes[store.ID] = store.PID
+	r.ctx.Logger().Info("router: registered store", "id", store.ID, "pid", store.PID, "total_routes", len(r.routes))
+}
+
+// RegisterActor 注册普通的 actor 到路由表
+func (r *baseRouter) RegisterActor(targetId string, pid *actor.PID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.routes[targetId] = pid
+	r.ctx.Logger().Info("router: registered actor", "id", targetId, "pid", pid, "total_routes", len(r.routes))
 }
 
 // Unregister 注销目标 Actor
@@ -65,9 +76,17 @@ func (r *baseRouter) Send(targetId string, msg any) {
 
 	pid, ok := r.routes[targetId]
 	if !ok {
+		r.ctx.Logger().Warn("router: target not found in routes", "target", targetId, "available_routes", len(r.routes))
+		// 打印所有可用的路由键以便调试
+		routeKeys := make([]string, 0, len(r.routes))
+		for k := range r.routes {
+			routeKeys = append(routeKeys, k)
+		}
+		r.ctx.Logger().Info("router: available routes", "count", len(r.routes), "routes", routeKeys)
 		return
 	}
 
+	r.ctx.Logger().Info("router: sending message to target", "target", targetId, "pid", pid)
 	r.ctx.Send(pid, msg)
 }
 

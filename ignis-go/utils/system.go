@@ -25,7 +25,7 @@ func WithLogger(logPaths ...string) actor.ConfigOption {
 	return actor.WithLoggerFactory(func(system *actor.ActorSystem) *slog.Logger {
 		return slog.New(tint.NewHandler(io.MultiWriter(writers...), &tint.Options{
 			AddSource:  true,
-			Level:      slog.LevelError,
+			Level:      slog.LevelInfo, // 改为 Info 级别，以便输出正常的日志
 			TimeFormat: time.DateTime,
 		})).With("system", system.ID)
 	})
