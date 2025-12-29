@@ -45,6 +45,7 @@ def inference(im_data: bytes):
         labels = labels_np.tolist()
 
     result_dict = {
+        "image": im,
         "boxes": boxes,
         "labels": labels,
         "scores": scores,

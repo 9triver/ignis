@@ -5,9 +5,10 @@ import cv2
 idx = 0
 
 
-def paint(image: np.ndarray, result: dict):
+def paint(result: dict):
     global idx
 
+    image = result["image"]
     confidence_threshold = 0.7  # 置信度阈值
 
     # 现在模型只输出2个类别：0=背景，1=头盔
