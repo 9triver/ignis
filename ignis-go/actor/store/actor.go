@@ -291,15 +291,14 @@ func (s *Actor) onFlowRequest(ctx actor.Context, req *RequestObject) {
 				s.mu.RLock()
 				defer s.mu.RUnlock()
 				delete(s.remoteObjects, flow.ID)
+			}
 
-				if s.cache == nil || err != nil {
-					return
-				}
-
-				ctx.Logger().Info("store: insert remote cache", "object", flow.ID)
-				s.cache.Insert(flow.ID, obj)
+			if s.cache == nil || err != nil {
 				return
 			}
+
+			ctx.Logger().Info("store: insert remote cache", "object", flow.ID)
+			s.cache.Insert(flow.ID, obj)
 		})
 	}
 }

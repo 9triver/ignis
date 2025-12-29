@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/9triver/ignis/actor/functions/python"
+	"github.com/9triver/ignis/actor/router"
 	"github.com/9triver/ignis/actor/store"
 	"github.com/9triver/ignis/monitor"
 	"github.com/9triver/ignis/object"
@@ -356,7 +357,9 @@ func SpawnTaskController(
 func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.Deployer,
 	c transport.Controller, onClose func()) *proto.ActorRef {
 
-	store := store.Spawn(ctx, nil, "store-"+appID)
+	// 创建本地路由器用于 store 通信
+	r := router.NewLocalRouter(ctx)
+	store := store.Spawn(ctx, r, "store-"+appID)
 
 	controllerId := "controller-" + appID
 	props := actor.PropsFromProducer(func() actor.Actor {
@@ -378,9 +381,20 @@ func SpawnTaskControllerV2(ctx *actor.RootContext, appID string, deployer task.D
 
 	go func() {
 		defer onClose()
+		// 等待连接就绪
+		select {
+		case <-c.Ready():
+			// 连接已就绪，继续处理消息
+		case <-time.After(30 * time.Second):
+			logrus.Errorf("Controller %s connection timeout", controllerId)
+			return
+		}
+
+		// 持续接收并转发消息
 		for msg := range c.RecvChan() {
 			ctx.Send(pid, msg)
 		}
+		logrus.Infof("Controller %s recv channel closed", controllerId)
 	}()
 
 	return &proto.ActorRef{
