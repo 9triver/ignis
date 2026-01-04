@@ -13,7 +13,7 @@ type Input struct {
 	Image image.Image
 }
 
-type Output image.Image
+type Output = image.Image
 
 func Impl(input Input) (Output, error) {
 	im := input.Image

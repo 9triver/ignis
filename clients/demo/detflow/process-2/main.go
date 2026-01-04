@@ -15,7 +15,7 @@ type Input struct {
 	Image   image.Image
 }
 
-type Output []byte
+type Output = []byte
 
 func mapGet[T any](m map[string]any, key string, orElse T) T {
 	v, ok := m[key]
