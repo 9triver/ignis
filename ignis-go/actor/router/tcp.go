@@ -1,8 +1,6 @@
 package router
 
 import (
-	"fmt"
-
 	"github.com/9triver/ignis/proto"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/remote"
@@ -15,10 +13,10 @@ type TCPRouter struct {
 	bootstrap, listener *actor.PID
 }
 
-func (r *TCPRouter) Send(targetId string, msg any) {
-	fmt.Printf("sending to %s via TCP\n", targetId)
-	r.baseRouter.Send(targetId, msg)
-}
+// func (r *TCPRouter) Send(targetId string, msg any) {
+// 	fmt.Printf("sending to %s via TCP\n", targetId)
+// 	r.baseRouter.Send(targetId, msg)
+// }
 
 func (r *TCPRouter) Register(store *proto.StoreRef) {
 	r.baseRouter.Register(store)
@@ -36,11 +34,11 @@ func NewTCPRouter(ctx Context, bootstrap *actor.PID, host string, port int) *TCP
 	}
 
 	serverOpts := remote.WithServerOptions(
-		grpc.MaxRecvMsgSize(512*1024*1024),
-		grpc.MaxSendMsgSize(512*1024*1024),
+		grpc.MaxRecvMsgSize(51400*1024*1024),
+		grpc.MaxSendMsgSize(51400*1024*1024),
 	)
 
-	remoter := remote.NewRemote(ctx.ActorSystem(), remote.Configure(host, port, serverOpts))
+	remoter := remote.NewRemote(ctx.ActorSystem(), remote.Configure(host, port, serverOpts, remote.WithEndpointWriterBatchSize(2)))
 	router.remoter = remoter
 	remoter.Start()
 

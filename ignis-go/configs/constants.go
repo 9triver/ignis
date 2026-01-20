@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	kDefaultSystemTimeout     = 30 * time.Second
+	kDefaultSystemTimeout     = 300 * time.Second
 	kDefaultExecutionTimeout  = 300 * time.Second
 	kDefaultChannelBufferSize = 16
 

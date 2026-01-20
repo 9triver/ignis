@@ -2,6 +2,7 @@ package benchmarks
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -34,12 +35,15 @@ func TestLocalSave(t *testing.T) {
 
 		var tic time.Time
 		producer := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
+			objs := make([]string, min(10, q))
+			for i := range objs {
+				objs[i] = generateObject(bytes)
+			}
+
 			tic = time.Now()
 			for i := range q {
-				obj := generateObject(bytes)
-
 				c.Send(storeRef.PID, &store.SaveObject{
-					Value: object.LocalWithID(fmt.Sprintf("obj-%d", i), obj, object.LangJson),
+					Value: object.LocalWithID(fmt.Sprintf("obj-%d", i), objs[i%10], object.LangJson),
 					Callback: func(ctx actor.Context, ref *proto.Flow) {
 						wg.Done()
 					},
@@ -53,59 +57,120 @@ func TestLocalSave(t *testing.T) {
 		averageLatency := totalLatency / time.Duration(q)
 		transmitted := float64(bytes) * float64(q) / 1024 / 1024
 		speed := transmitted / totalLatency.Seconds()
-		t.Logf("Average save latency: %d us", averageLatency.Microseconds())
+		t.Logf("Average save latency: %d ns", averageLatency.Nanoseconds())
 		t.Logf("Transmitted: %.2f MB, Speed: %.2f MB/s", transmitted, speed)
 		t.Log("========================================")
 
 		WriteResult(
 			"bytes", bytes,
 			"q", q,
-			"lat_us", averageLatency.Microseconds(),
+			"lat_ns", averageLatency.Nanoseconds(),
 			"speed_mbps", speed,
 			"transmitted_mb", transmitted,
 		)
 	}
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
 	doTest(1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(1024*1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(16*1024*1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(16*1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(64*1024*1024, 2)
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	doTest(64*1024*1024, 8)
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	doTest(64*1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(64*1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 64)
 }
 
 func TestLocalLoad(t *testing.T) {
@@ -127,10 +192,14 @@ func TestLocalLoad(t *testing.T) {
 		defer ctx.Stop(storeRef.PID)
 
 		producer := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
+			objs := make([]string, min(10, q))
+			for i := range objs {
+				objs[i] = generateObject(bytes)
+			}
+
 			for i := range q {
-				obj := generateObject(bytes)
 				c.Send(storeRef.PID, &store.SaveObject{
-					Value: object.LocalWithID(fmt.Sprintf("obj-%d", i), obj, object.LangJson),
+					Value: object.LocalWithID(fmt.Sprintf("obj-%d", i), objs[i%10], object.LangJson),
 					Callback: func(ctx actor.Context, ref *proto.Flow) {
 						wg.Done()
 					},
@@ -181,46 +250,112 @@ func TestLocalLoad(t *testing.T) {
 		)
 	}
 
-	doTest(1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(1024, 2)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(1024*1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 128)
 
-	time.Sleep(10 * time.Second)
+	runtime.GC()
+
+	doTest(1024*1024, 4)
+
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 8)
+
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 16)
+
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 32)
+
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(16*1024*1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(16*1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(64*1024*1024, 2)
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	doTest(64*1024*1024, 8)
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	doTest(64*1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(64*1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 64)
 }
 
 func TestLocalLoadNoZeroCopy(t *testing.T) {
@@ -244,10 +379,8 @@ func TestLocalLoadNoZeroCopy(t *testing.T) {
 		producer := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 			for i := range q {
 				obj := object.LocalWithID(fmt.Sprintf("obj-%d", i), generateObject(bytes), object.LangJson)
-				// encoding object disables zero-copy
-				enc, _ := obj.Encode()
 				c.Send(storeRef.PID, &store.SaveObject{
-					Value: enc,
+					Value: obj,
 					Callback: func(ctx actor.Context, ref *proto.Flow) {
 						wg.Done()
 					},
@@ -261,6 +394,7 @@ func TestLocalLoadNoZeroCopy(t *testing.T) {
 		var totalLatency time.Duration
 		collector := ctx.Spawn(actor.PropsFromFunc(func(c actor.Context) {
 			tic := time.Now()
+
 			switch msg := c.Message().(type) {
 			case *actor.Started:
 				for i := range q {
@@ -274,7 +408,10 @@ func TestLocalLoadNoZeroCopy(t *testing.T) {
 					})
 				}
 			case *store.ObjectResponse:
-				_, _ = msg.Value.Value()
+				v, _ := msg.Value.Value()
+				tmp := make([]byte, bytes)
+				copy(tmp, []byte(v.(string)))
+
 				latency := time.Since(tic)
 				totalLatency += latency
 				wg.Done()
@@ -293,50 +430,109 @@ func TestLocalLoadNoZeroCopy(t *testing.T) {
 		WriteResult(
 			"bytes", bytes,
 			"q", q,
-			"lat_us", averageLatency.Microseconds(),
+			"lat_ns", averageLatency.Nanoseconds(),
 			"speed_mbps", speed,
 			"transmitted_mb", transmitted,
 		)
 	}
 
 	doTest(1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(1024*1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(1024*1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(16*1024*1024, 2)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 8)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(16*1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
 
-	time.Sleep(10 * time.Second)
+	doTest(16*1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 8)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 32)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(16*1024*1024, 64)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	t.Log()
 
 	doTest(64*1024*1024, 2)
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 4)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	doTest(64*1024*1024, 8)
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 16)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
 	doTest(64*1024*1024, 32)
-	time.Sleep(5 * time.Second)
-	doTest(64*1024*1024, 128)
+	runtime.GC()
+	time.Sleep(500 * time.Millisecond)
+
+	doTest(64*1024*1024, 64)
 }

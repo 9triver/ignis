@@ -1,7 +1,10 @@
 package benchmarks
 
 import (
+	"os"
+	"os/exec"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,6 +24,8 @@ func TestLocalResource(t *testing.T) {
 		var m1, m2, m3 runtime.MemStats
 		runtime.ReadMemStats(&m1)
 
+		tic := time.Now()
+
 		opts := utils.WithLogger()
 		sys := actor.NewActorSystem(opts)
 		defer sys.Shutdown()
@@ -37,6 +42,7 @@ func TestLocalResource(t *testing.T) {
 
 		startup := float64(m2.Alloc-m1.Alloc) / 1024 / 1024
 		t.Logf("store startup: allocated %.3f MB", startup)
+		latencyStore := time.Since(tic)
 
 		props := compute.NewActor(
 			"test",
@@ -51,6 +57,9 @@ func TestLocalResource(t *testing.T) {
 			defer ctx.Stop(pid)
 		}
 
+		latencyTotal := time.Since(tic)
+		latencyActor := latencyTotal - latencyStore
+
 		time.Sleep(300 * time.Millisecond)
 		runtime.ReadMemStats(&m3)
 
@@ -63,18 +72,33 @@ func TestLocalResource(t *testing.T) {
 			"startup_mb", startup,
 			"actors_mb", actors,
 			"total_mb", total,
+			"startup_ns", latencyStore.Nanoseconds(),
+			"actors_ns", latencyActor.Nanoseconds(),
+			"latency_ns", latencyTotal.Nanoseconds(),
 		)
 	}
 
-	doTest(10)
-	time.Sleep(3 * time.Second)
+	doTest(0)
 	runtime.GC()
+	time.Sleep(1 * time.Second)
 
 	doTest(100)
-	time.Sleep(3 * time.Second)
 	runtime.GC()
+	time.Sleep(1 * time.Second)
 
-	doTest(1000)
+	doTest(200)
+	runtime.GC()
+	time.Sleep(1 * time.Second)
+
+	doTest(300)
+	runtime.GC()
+	time.Sleep(1 * time.Second)
+
+	doTest(400)
+	runtime.GC()
+	time.Sleep(1 * time.Second)
+
+	doTest(500)
 }
 
 func TestClusterResource(t *testing.T) {
@@ -86,7 +110,7 @@ func TestClusterResource(t *testing.T) {
 
 		opts := utils.WithLogger()
 
-		sys1 := actor.NewActorSystem()
+		sys1 := actor.NewActorSystem(opts)
 		defer sys1.Shutdown()
 
 		ctx1 := sys1.Root
@@ -99,33 +123,44 @@ func TestClusterResource(t *testing.T) {
 		time.Sleep(300 * time.Millisecond)
 		runtime.ReadMemStats(&m2)
 
-		single := float64(m2.Alloc-m1.Alloc) / 1024 / 1024
-		t.Logf("spawn single: allocated %.3f MB", single)
+		startup := float64(m2.Alloc-m1.Alloc) / 1024 / 1024
+		t.Logf("spawn single: allocated %.3f MB", startup)
 
 		// create remote connections
-		pid := actor.NewPID("127.0.0.1:3000", "bootstrap")
 		for i := range nRemoters {
-			sysi := actor.NewActorSystem(opts)
-			defer sysi.Shutdown()
+			c := exec.Command("./remoter/main", "-port", strconv.Itoa(3001+i))
+			if i == 0 {
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
 
-			ri := router.NewTCPRouter(sysi.Root, pid, "127.0.0.1", 3001+i)
-			defer ri.Shutdown()
+			}
+			go c.Run()
 		}
 
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(3 * time.Second)
+
 		runtime.ReadMemStats(&m3)
 
-		total := float64(m3.Alloc-m2.Alloc) / 1024 / 1024
-		t.Logf("spawn %d remoters: allocated %.3f MB (average %.3f MB)", nRemoters, total, total/float64(nRemoters))
-		WriteResult("nRemoters", nRemoters, "single_mb", single, "total_mb", total)
+		remoters := float64(m3.Alloc-m2.Alloc) / 1024 / 1024
+		total := float64(m3.Alloc-m1.Alloc) / 1024 / 1024
+		t.Logf("spawn %d remoters: allocated %.3f MB (average %.3f MB)", nRemoters, remoters, remoters/float64(nRemoters))
+		WriteResult("nRemoters", nRemoters, "startup_mb", startup, "remoter_mb", remoters, "total_mb", total)
 	}
 
-	doTest(10)
-	time.Sleep(3 * time.Second)
+	doTest(0)
+	time.Sleep(1 * time.Second)
+	runtime.GC()
+
+	doTest(25)
+	time.Sleep(1 * time.Second)
 	runtime.GC()
 
 	doTest(50)
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
+	runtime.GC()
+
+	doTest(75)
+	time.Sleep(1 * time.Second)
 	runtime.GC()
 
 	doTest(100)

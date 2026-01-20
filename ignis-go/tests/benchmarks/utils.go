@@ -8,7 +8,7 @@ import (
 )
 
 func generateObject(n int) string {
-	return strings.Repeat("b", n)
+	return strings.Repeat("x", n)
 }
 
 var results []map[string]any

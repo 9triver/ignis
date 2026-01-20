@@ -98,7 +98,7 @@ func TestSchd(t *testing.T) {
 		)
 	}
 
-	nClouds := 1
+	nClouds := 2
 	nEdges := 10
 	nTasks := 256
 
@@ -168,26 +168,22 @@ func TestSchdOverhead(t *testing.T) {
 	edgeLink := 100 * time.Millisecond
 	edgeLat := 100 * time.Millisecond
 
-	doTest(edgeLink, edgeLat, 256, 8)
-	doTest(edgeLink, edgeLat, 256, 32)
-	doTest(edgeLink, edgeLat, 256, 128)
+	doTest(edgeLink, edgeLat, 100, 5)
+	doTest(edgeLink, edgeLat, 100, 10)
+	doTest(edgeLink, edgeLat, 100, 50)
+	doTest(edgeLink, edgeLat, 100, 100)
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
-	doTest(edgeLink, edgeLat, 1024, 8)
-	doTest(edgeLink, edgeLat, 1024, 32)
-	doTest(edgeLink, edgeLat, 1024, 128)
+	doTest(edgeLink, edgeLat, 200, 5)
+	doTest(edgeLink, edgeLat, 200, 10)
+	doTest(edgeLink, edgeLat, 200, 50)
+	doTest(edgeLink, edgeLat, 200, 100)
 
-	edgeLink = 100 * time.Millisecond
-	edgeLat = 500 * time.Millisecond
+	time.Sleep(3 * time.Second)
 
-	doTest(edgeLink, edgeLat, 256, 8)
-	doTest(edgeLink, edgeLat, 256, 32)
-	doTest(edgeLink, edgeLat, 256, 128)
-
-	time.Sleep(5 * time.Second)
-
-	doTest(edgeLink, edgeLat, 1024, 8)
-	doTest(edgeLink, edgeLat, 1024, 32)
-	doTest(edgeLink, edgeLat, 1024, 128)
+	doTest(edgeLink, edgeLat, 500, 5)
+	doTest(edgeLink, edgeLat, 500, 10)
+	doTest(edgeLink, edgeLat, 500, 50)
+	doTest(edgeLink, edgeLat, 500, 100)
 }
